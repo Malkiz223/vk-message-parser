@@ -4,9 +4,7 @@ import settings
 import time
 import os
 
-# TODO: сделать два экземпляра класса - для меня и для собеседника.
 # TODO: записывать сообщения и подобную информацию в базу
-# TODO: создавать папки циклом? (актуально с базой?)
 # TODO: запись контекстным менеджером? (актуально с базой?)
 # TODO: можно добавлять статистику в словари
 '''
@@ -15,17 +13,103 @@ import os
 '''
 
 
-# 1 - как называть репозиторий на гитхабе? (куда кликать, чтобы адекватно там залогиниться и создать репозиторий?:D)
-# 2 - нормальный ли вариант - выносить инициализирующие параметры в абстрактный класс?
+class VkUser:
+    """
+    Создаёт инстанс класса пользователя, который принимает ID отправителя сообщения
+    """
 
-class Vk:
-    try:
-        os.mkdir('sessions/')
-    except FileExistsError:
-        pass
-
-    def __init__(self, user_id, login, password, two_factor=True):
+    def __init__(self, user_id):
         self.user_id = user_id
+
+        self.statistics = {
+            'message_counter': 0,
+            'sticker_counter': 0,
+            'link_counter': 0,
+        }
+
+        self.FOLDER_NAME = f'Сообщения от {self.user_id}'
+
+        if not os.path.exists(self.FOLDER_NAME):
+            os.mkdir(self.FOLDER_NAME)
+
+    def parse_message(self, message):
+
+        if message['text']:
+            text = message['text'].replace('\n', ' ')
+            f = open(fr'{self.FOLDER_NAME}\Сообщения.txt', 'a', encoding='UTF-8')
+            f.write(text + '\n')
+
+        if message['attachments']:
+            for attachment in message['attachments']:
+                if attachment['type'] == 'sticker':
+                    f = open(fr'{self.FOLDER_NAME}\Стикеры.txt', 'a', encoding='UTF-8')
+                    f.write(str(attachment['sticker']['sticker_id']) + '\n')
+                    f.close()
+
+                elif attachment['type'] == 'link':
+                    f = open(fr'{self.FOLDER_NAME}\Ссылки.txt', 'a', encoding='UTF-8')
+                    f.write(attachment['link']['url'] + '\n')
+                    f.close()
+                elif attachment['type'] == 'doc':
+                    if attachment['doc']['ext'] == 'gif':
+                        f = open(fr'{self.FOLDER_NAME}\Гифки.txt', 'a', encoding='UTF-8')
+                        f.write(attachment['doc']['url'] + '\n')
+                        f.close()
+                    else:
+                        f = open(fr'{self.FOLDER_NAME}\Документы.txt', 'a', encoding='UTF-8')
+                        f.write(attachment['doc']['title'] + ' ' + attachment['doc']['url'] + '\n')
+                        f.close()
+                elif attachment['type'] == 'photo':
+                    f = open(fr'{self.FOLDER_NAME}\Фото.txt', 'a', encoding='UTF-8')
+                    f.write(attachment['photo']['sizes'][-1]['url'] + '\n')
+                    f.close()
+                elif attachment['type'] == 'video':
+                    f = open(fr'{self.FOLDER_NAME}\Видео.txt', 'a', encoding='UTF-8')
+                    f.write(attachment['video']['title'] + '\n')
+                    f.close()
+                elif attachment['type'] == 'audio_message':
+                    audio_date_in_seconds = message['date']
+                    date_time = datetime.fromtimestamp(audio_date_in_seconds)
+                    date_time = date_time.strftime("%d.%m.%Y ")
+                    f = open(fr'{self.FOLDER_NAME}\Аудиосообщения.txt', 'a', encoding='UTF-8')
+                    f.write(date_time + str(attachment['audio_message']['duration']) + '\n')
+                    f.close()
+                elif attachment['type'] == 'wall':
+                    f = open(fr'{self.FOLDER_NAME}\Записи на стене.txt', 'a', encoding='UTF-8')
+                    f.write('1\n')
+                    f.close()
+                elif attachment['type'] == 'audio':
+                    f = open(fr'{self.FOLDER_NAME}\Аудиозаписи.txt', 'a', encoding='UTF-8')
+                    f.write(attachment['audio']['title'] + '\n')
+                    f.close()
+                elif attachment['type'] == 'gift':
+                    f = open(fr'{self.FOLDER_NAME}\Подарки.txt', 'a', encoding='UTF-8')
+                    f.write(attachment['gift']['thumb_256'] + '\n')
+                    f.close()
+                elif attachment['type'] == 'call':
+                    f = open(fr'{self.FOLDER_NAME}\Звонки.txt', 'a', encoding='UTF-8')
+                    f.write(attachment['call']['state'] + '\n')
+                    f.close()
+                elif attachment['type'] == 'graffiti':
+                    f = open(fr'{self.FOLDER_NAME}\Граффити.txt', 'a', encoding='UTF-8')
+                    f.write(attachment['graffiti']['url'] + '\n')
+                    f.close()
+                elif attachment['type'] == 'story':
+                    f = open(fr'{self.FOLDER_NAME}\Сториз.txt', 'a', encoding='UTF-8')
+                    f.write('1\n')
+                    f.close()
+                else:
+                    print(attachment)
+
+
+class VkParser:
+    """
+    Авторизируется в VK по указанным логину и паролю, есть поддержка двухфакторной авторизации.
+    Сканирует сообщения с указанным пользователем, создаёт инстансы класса VkUser
+    """
+
+    def __init__(self, dialogue_id, login=settings.login, password=settings.password, two_factor=True):
+        self.user_id = dialogue_id
         self.login = login
         self.password = password
         self.two_factor = two_factor
@@ -33,107 +117,28 @@ class Vk:
         self.offset_scanned_messages = 0
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
 
-        self.messages = MessagesAPI(login=self.login, password=self.password, two_factor=self.two_factor,
-                                    cookies_save_path='sessions/')
-        self.TOTAL_MESSAGES = self.messages.method('messages.getHistory', user_id=self.user_id)['count']
-        self.MY_FOLDER_NAME = f'{self.user_id} - исходящие'
-        self.HIS_FOLDER_NAME = f'{self.user_id} - входящие'
+        if not os.path.exists('sessions/'):
+            os.mkdir('sessions/')
 
-        self.my_messages = 0
+        # Start session
+        self.messages_api = MessagesAPI(login=self.login, password=self.password, two_factor=self.two_factor,
+                                        cookies_save_path='sessions/')
 
-        try:
-            os.mkdir(self.MY_FOLDER_NAME)
-        except FileExistsError:
-            pass
-        try:
-            os.mkdir(self.HIS_FOLDER_NAME)
-        except FileExistsError:
-            pass
-
-    def parse_message(self, message):
-        if message['from_id'] == self.user_id:  # если сообщение не от меня
-            folder_name = self.HIS_FOLDER_NAME
-        else:
-            folder_name = self.MY_FOLDER_NAME
-
-        if message['text']:
-            text = message['text'].replace('\n', ' ')
-            f = open(fr'{folder_name}\Сообщения.txt', 'a', encoding='UTF-8')
-            f.write(text + '\n')
-            self.my_messages += 1
-
-        if message['attachments']:
-            for attachment in message['attachments']:
-                if attachment['type'] == 'sticker':
-                    f = open(fr'{folder_name}\Стикеры.txt', 'a', encoding='UTF-8')
-                    f.write(str(attachment['sticker']['sticker_id']) + '\n')
-                    f.close()
-
-                elif attachment['type'] == 'link':
-                    f = open(fr'{folder_name}\Ссылки.txt', 'a', encoding='UTF-8')
-                    f.write(attachment['link']['url'] + '\n')
-                    f.close()
-                elif attachment['type'] == 'doc':
-                    if attachment['doc']['ext'] == 'gif':
-                        f = open(fr'{folder_name}\Гифки.txt', 'a', encoding='UTF-8')
-                        f.write(attachment['doc']['url'] + '\n')
-                        f.close()
-                    else:
-                        f = open(fr'{folder_name}\Документы.txt', 'a', encoding='UTF-8')
-                        f.write(attachment['doc']['title'] + ' ' + attachment['doc']['url'] + '\n')
-                        f.close()
-                elif attachment['type'] == 'photo':
-                    f = open(fr'{folder_name}\Фото.txt', 'a', encoding='UTF-8')
-                    f.write(attachment['photo']['sizes'][-1]['url'] + '\n')
-                    f.close()
-                elif attachment['type'] == 'video':
-                    f = open(fr'{folder_name}\Видео.txt', 'a', encoding='UTF-8')
-                    f.write(attachment['video']['title'] + '\n')
-                    f.close()
-                elif attachment['type'] == 'audio_message':
-                    audio_date_in_seconds = message['date']
-                    date_time = datetime.fromtimestamp(audio_date_in_seconds)
-                    date_time = date_time.strftime("%d.%m.%Y ")
-                    f = open(fr'{folder_name}\Аудиосообщения.txt', 'a', encoding='UTF-8')
-                    f.write(date_time + str(attachment['audio_message']['duration']) + '\n')
-                    f.close()
-                elif attachment['type'] == 'wall':
-                    f = open(fr'{folder_name}\Записи на стене.txt', 'a', encoding='UTF-8')
-                    f.write('1\n')
-                    f.close()
-                elif attachment['type'] == 'audio':
-                    f = open(fr'{folder_name}\Аудиозаписи.txt', 'a', encoding='UTF-8')
-                    f.write(attachment['audio']['title'] + '\n')
-                    f.close()
-                elif attachment['type'] == 'gift':
-                    f = open(fr'{folder_name}\Подарки.txt', 'a', encoding='UTF-8')
-                    f.write(attachment['gift']['thumb_256'] + '\n')
-                    f.close()
-                elif attachment['type'] == 'call':
-                    f = open(fr'{folder_name}\Звонки.txt', 'a', encoding='UTF-8')
-                    f.write(attachment['call']['state'] + '\n')
-                    f.close()
-                elif attachment['type'] == 'graffiti':
-                    f = open(fr'{folder_name}\Граффити.txt', 'a', encoding='UTF-8')
-                    f.write(attachment['graffiti']['url'] + '\n')
-                    f.close()
-                elif attachment['type'] == 'story':
-                    f = open(fr'{folder_name}\Сториз.txt', 'a', encoding='UTF-8')
-                    f.write('1\n')
-                    f.close()
-                else:
-                    print(attachment)
+        self.TOTAL_MESSAGES = self.messages_api.method('messages.getHistory', user_id=self.user_id)['count']
 
     def run(self):
-        scan_cycles = self.TOTAL_MESSAGES // self.SCAN_MESSAGES_PER_CALL + 1
-        for _ in range(scan_cycles):
+        number_of_scan_cycles = self.TOTAL_MESSAGES // self.SCAN_MESSAGES_PER_CALL + 1
+        for _ in range(number_of_scan_cycles):
+            json_messages = self.messages_api.method('messages.getHistory', user_id=self.user_id,
+                                                     count=self.SCAN_MESSAGES_PER_CALL,
+                                                     rev=-1, offset=self.offset_scanned_messages)
+            for message in json_messages['items']:
+                if message['from_id'] == my_id:
+                    my_vk.parse_message(message)
+                if message['from_id'] == friend_id:
+                    vk_friend.parse_message(message)
 
-            history = self.messages.method('messages.getHistory', user_id=self.user_id,
-                                           count=self.SCAN_MESSAGES_PER_CALL,
-                                           rev=-1, offset=self.offset_scanned_messages)
             print(f'Просканировано {self.now_scanned} из {self.TOTAL_MESSAGES} сообщений')
-            for message in history['items']:
-                self.parse_message(message)
 
             self.offset_scanned_messages += self.SCAN_MESSAGES_PER_CALL
             self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
@@ -143,5 +148,10 @@ class Vk:
 
 
 if __name__ == '__main__':
-    vk = Vk(user_id=183145350, login=settings.login, password=settings.password)
-    vk.run()
+    my_id = 22491953
+    friend_id = 183145350
+    my_vk = VkUser(my_id)
+    vk_friend = VkUser(friend_id)
+
+    vk_parse = VkParser(dialogue_id=friend_id)
+    vk_parse.run()
