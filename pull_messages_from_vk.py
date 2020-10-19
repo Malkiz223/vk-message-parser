@@ -9,21 +9,19 @@ import os
 # TODO: записывать сообщения и подобную информацию в базу
 
 class VkUser:
-    """
-    Создаёт инстанс класса пользователя, который принимает ID отправителя сообщения
+    """Пользователь ВК, участвующий в переписке
+    :arg user_id (int): ID пользователя
+    :arg messages_api (class): API VK
     """
 
     def __init__(self, user_id):
         self.user_id = user_id
 
-
         if not os.path.exists('sessions/'):
             os.mkdir('sessions/')
-        # Start session
-        self.messages_api = MessagesAPI(login=settings.login, password=settings.password, two_factor=True,
-                                        cookies_save_path='sessions/')
-        self.first_name = self.messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['first_name']
-        self.last_name = self.messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['last_name']
+
+        self.first_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['first_name']
+        self.last_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['last_name']
         self.FOLDER_NAME = f'Сообщения от {self.first_name} {self.last_name}'
 
         self.statistics = {
@@ -47,6 +45,12 @@ class VkUser:
         }
 
     def parse_message(self, message):
+        """
+        Принимает JSON на 200 сообщений, разбивает сообщение на части и кладёт эти части в определённые словари
+        Собирает статистику по различным метрикам - текст, стикеры, ссылки, ссылки на фото, на видео и так далее
+        :param message: Строка формата JSON
+        :return: None
+        """
         if message['text']:
             text = message['text'].replace('\n', ' ')
             self.statistics['messages'].append(text)
@@ -92,6 +96,10 @@ class VkUser:
                     print(attachment)
 
     def print_statistics(self):
+        """
+        Печатает в консоль отформатированную статистику, собранную в self.statistics
+        :return: None
+        """
         print('@' * 60)
         print(f'Статистика от {self.first_name} {self.last_name}:')
         if self.statistics['messages']:
@@ -135,6 +143,10 @@ class VkUser:
         print()
 
     def write_statistics_to_files(self):
+        """
+        Пишет все значения self.statistics в отдельные файлы по категориям
+        :return: None
+        """
         if not os.path.exists(self.FOLDER_NAME):
             os.mkdir(self.FOLDER_NAME)
         for filename in self.statistics.keys():
@@ -148,15 +160,11 @@ class VkUser:
 
 class VkParser:
     """
-    Авторизируется в VK по указанным логину и паролю, есть поддержка двухфакторной авторизации.
-    Сканирует сообщения с указанным пользователем, создаёт инстансы класса VkUser
+    Сканирует сообщения с указанным пользователем
     """
 
-    def __init__(self, dialogue_id, login=settings.login, password=settings.password, two_factor=True):
-        self.dialogue_id = dialogue_id
-        self.login = login
-        self.password = password
-        self.two_factor = two_factor
+    def __init__(self, friend_id):
+        self.friend_id = friend_id
         self.SCAN_MESSAGES_PER_CALL = 200
         self.offset_scanned_messages = 0
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
@@ -164,18 +172,14 @@ class VkParser:
         if not os.path.exists('sessions/'):
             os.mkdir('sessions/')
 
-        # Start session
-        self.messages_api = MessagesAPI(login=self.login, password=self.password, two_factor=self.two_factor,
-                                        cookies_save_path='sessions/')
-
-        self.TOTAL_MESSAGES = self.messages_api.method('messages.getHistory', user_id=self.dialogue_id)['count']
+        self.TOTAL_MESSAGES = messages_api.method('messages.getHistory', user_id=self.friend_id)['count']
 
     def run(self):
         number_of_scan_cycles = self.TOTAL_MESSAGES // self.SCAN_MESSAGES_PER_CALL + 1
         for _ in range(number_of_scan_cycles):
-            json_messages = self.messages_api.method('messages.getHistory', user_id=self.dialogue_id,
-                                                     count=self.SCAN_MESSAGES_PER_CALL,
-                                                     rev=-1, offset=self.offset_scanned_messages)
+            json_messages = messages_api.method('messages.getHistory', user_id=self.friend_id,
+                                                count=self.SCAN_MESSAGES_PER_CALL,
+                                                rev=-1, offset=self.offset_scanned_messages)
             for message in json_messages['items']:
                 if message['from_id'] == my_id:
                     my_vk.parse_message(message)
@@ -188,19 +192,19 @@ class VkParser:
             self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
             if self.now_scanned > self.TOTAL_MESSAGES:
                 self.now_scanned = self.TOTAL_MESSAGES
-            time.sleep(0.2)
+            time.sleep(1)  # 0.2 рекомендуется
 
 
 if __name__ == '__main__':
-    my_id = 22491953
-    friend_id = 17026394
+    my_id = 123
+    friend_id = 456
+
+    # Start session
+    messages_api = MessagesAPI(login=settings.login, password=settings.password, two_factor=True,
+                               cookies_save_path='sessions/')
+
     my_vk = VkUser(my_id)
     vk_friend = VkUser(friend_id)
 
-    vk_parse = VkParser(dialogue_id=friend_id)
+    vk_parse = VkParser(friend_id)
     vk_parse.run()
-    my_vk.print_statistics()
-    vk_friend.print_statistics()
-
-    my_vk.write_statistics_to_files()
-    vk_friend.write_statistics_to_files()
