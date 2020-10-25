@@ -13,8 +13,13 @@ class VkUser(Vk):
 
     def __init__(self, user_id, messages_api=Vk.messages_api):
         self.user_id = user_id
-        self.first_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['first_name']
-        self.last_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['last_name']
+        while True:
+            try:
+                self.first_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['first_name']
+                self.last_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['last_name']
+                break
+            except AttributeError:
+                print(f'Ошибка при входе в сеть. Но всё в порядке, работаем дальше')
         self.FOLDER_NAME = f'Сообщения от {self.first_name} {self.last_name}'
 
         self.statistics = {
@@ -88,7 +93,7 @@ class VkUser(Vk):
                 else:
                     print(attachment)
 
-    def print_statistics(self):
+    def print_statistics_to_console(self):
         """
         Печатает в консоль отформатированную статистику, собранную в self.statistics
         :return: None
