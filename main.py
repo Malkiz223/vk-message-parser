@@ -3,15 +3,22 @@ import settings
 from vk_parser import VkParser
 from vk_user import VkUser
 
-if __name__ == '__main__':
-    friend_id = 183145350
-    my_vk = VkUser(settings.my_id)
-    vk_friend = VkUser(friend_id)
 
-    vk_parser = VkParser(friend_id)
+def main(FRIEND_ID):
+    my_vk = VkUser(settings.MY_ID)
+    vk_friend = VkUser(FRIEND_ID)
+
+    vk_parser = VkParser(FRIEND_ID)
     vk_parser.run()
+
+    # Собирает статистику сообщений, передавая её в инстансы VkUser
     for message in vk_parser.all_json_messages:
-        if message['from_id'] == friend_id:
+        if message['from_id'] == FRIEND_ID:
             vk_friend.collect_statistics(message)
         else:
             my_vk.collect_statistics(message)
+
+
+if __name__ == '__main__':
+    FRIEND_ID = 123
+    main(FRIEND_ID)
