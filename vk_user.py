@@ -15,8 +15,10 @@ class VkUser(Vk):
         self.user_id = user_id
         while True:
             try:
-                self.first_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['first_name']
-                self.last_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0]['last_name']
+                self.first_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0][
+                    'first_name']
+                self.last_name = messages_api.method('users.get', user_ids=self.user_id, name_case='gen')[0][
+                    'last_name']
                 break
             except AttributeError:
                 print(f'Ошибка при входе в сеть. Но всё в порядке, работаем дальше')
@@ -154,3 +156,23 @@ class VkUser(Vk):
                         f.write('\n'.join([str(message) for message in self.statistics[f'{filename}']]))
                     except TypeError:
                         f.write(str(self.statistics[f'{filename}']))
+
+    def print_most_popular_words(self, top_words=10, word_length_from=3):
+        word_counter = Counter()
+        result_words = []
+        bad_chars = [':', '.', ',', '\'', '/', '\\', '!', '@', '"', ';', '?', '*', '(', ')', '=', '+',
+                     '[', ']', '`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '&', '#']
+        for message in self.statistics['messages']:
+            words = message.split()
+            for word in words:
+                result_words.append(''.join([char for char in word if char not in bad_chars]))
+        for word in result_words:
+            if len(word) >= word_length_from:
+                word_counter[f'{word.capitalize()}'] += 1
+
+        print(f'Топ {top_words} самых популярных слов длинее {word_length_from} букв от {self.first_name} {self.last_name}')
+        number = 1
+        for word, count in word_counter.most_common(top_words):
+            print(f'{number}) {word} - {count} раз')
+            number += 1
+        print()
