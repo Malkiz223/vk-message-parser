@@ -158,6 +158,12 @@ class VkUser(Vk):
                         f.write(str(self.statistics[f'{filename}']))
 
     def print_most_popular_words(self, top_words=10, word_length_from=3):
+        """
+        Печатает в консоль заданное количество слов с длиной от N символов
+        :param top_words: Количество слов, которое нужно вывести
+        :param word_length_from: От этого количества букв слово попадает в топ
+        :return: None
+        """
         word_counter = Counter()
         result_words = []
         bad_chars = [':', '.', ',', '\'', '/', '\\', '!', '@', '"', ';', '?', '*', '(', ')', '=', '+',
