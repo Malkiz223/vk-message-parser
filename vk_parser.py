@@ -31,10 +31,10 @@ class VkParser(Vk):
             for message in json_messages['items']:
                 self.all_json_messages.append(message)
             self.offset_scanned_messages += self.SCAN_MESSAGES_PER_CALL
-        except AttributeError as err:
-            print(f'Поймал {err}, продолжаю работу. Сообщения не потеряны, всё стабильно!')
-        except BaseException as err:
-            print(f'Поймали {err}')
+        except AttributeError:
+            pass
+        except BaseException:
+            pass
 
     def print_parsing_progress_to_console(self):
         """
