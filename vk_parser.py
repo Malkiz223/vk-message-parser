@@ -25,7 +25,7 @@ class VkParser:
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
         self.total_messages = self.messages_api.method('messages.getHistory', user_id=self.FRIEND_ID)['count']
 
-    def get_messages_from_vk(self):
+    def get_messages_from_vk(self) -> None:
         """
         Обращается к API VK и вытягивает 200 сообщений.
         При каждом вызове offset смещается, позволяя запарсить следующие 200 сообщений.
@@ -43,7 +43,7 @@ class VkParser:
         except BaseException:
             pass
 
-    def print_parsing_progress_to_console(self):
+    def print_parsing_progress_to_console(self) -> None:
         """
         Печатает в консоль прогресс сканирования сообщений.
         :return: None
@@ -53,7 +53,7 @@ class VkParser:
         print(f'Просканировано {self.now_scanned} из {self.total_messages} сообщений')
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
 
-    def run(self):
+    def run(self) -> None:
         """
         Основная функция, запускает парсинг сообщений, выжидая между парсингом определённое время и печатая статистику.
         :return: None
