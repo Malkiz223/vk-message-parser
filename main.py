@@ -26,5 +26,5 @@ def main(FRIEND_ID):
 
 
 if __name__ == '__main__':
-    FRIEND_ID =  # int
+    FRIEND_ID = 123  # int
     main(FRIEND_ID)
