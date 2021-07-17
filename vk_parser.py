@@ -1,22 +1,29 @@
+import os
 import time
 
-from vk import Vk
+from vk_messages import MessagesAPI
+
+import settings
 
 
-class VkParser(Vk):
+class VkParser:
     """
     Сканирует сообщения с указанным пользователем.
     :arg friend_id (int): ID собеседника в VK
     :arg messages_api (class): API VK
     """
 
-    def __init__(self, friend_id, messages_api=Vk.messages_api):
+    def __init__(self, friend_id):
+        if not os.path.exists('sessions/'):
+            os.mkdir('sessions/')
+        self.messages_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD, two_factor=True,
+                                        cookies_save_path='sessions/')
         self.FRIEND_ID = friend_id
         self.all_json_messages = []
         self.SCAN_MESSAGES_PER_CALL = 200
         self.offset_scanned_messages = 0
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
-        self.total_messages = messages_api.method('messages.getHistory', user_id=self.FRIEND_ID)['count']
+        self.total_messages = self.messages_api.method('messages.getHistory', user_id=self.FRIEND_ID)['count']
 
     def get_messages_from_vk(self):
         """
