@@ -20,6 +20,7 @@ class VkParser:
         self.all_json_messages = []
         self.SCAN_MESSAGES_PER_CALL = 200
         self.offset_scanned_messages = 0
+        self.count_messages_was_printed = 0
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
         self.total_messages = self.messages_api.method('messages.getHistory', user_id=self.FRIEND_ID)['count']
 
@@ -35,9 +36,7 @@ class VkParser:
             for message in json_messages['items']:
                 self.all_json_messages.append(message)
             self.offset_scanned_messages += self.SCAN_MESSAGES_PER_CALL
-        except AttributeError:
-            pass
-        except BaseException:
+        except (BaseException, AttributeError):
             pass
 
     def print_parsing_progress_to_console(self) -> None:
@@ -45,8 +44,10 @@ class VkParser:
         Печатает в консоль прогресс сканирования сообщений. При дублировании значения пропускает печать
         """
         if self.now_scanned > self.total_messages:
-            self.now_scanned = self.total_messages
-        print(f'Просканировано {self.now_scanned} из {self.total_messages} сообщений')
+            self.now_scanned = self.total_messages  # чтобы не превышало верхний предел сообщений
+        if self.count_messages_was_printed < self.now_scanned:  # если уже печатало данное количество - скипаем
+            print(f'Просканировано {self.now_scanned} из {self.total_messages} сообщений')
+            self.count_messages_was_printed = self.now_scanned
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
 
     def run(self) -> None:
