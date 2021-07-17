@@ -9,8 +9,6 @@ import settings
 class VkParser:
     """
     Сканирует сообщения с указанным пользователем.
-    :arg friend_id (int): ID собеседника в VK
-    :arg messages_api (class): API VK
     """
 
     def __init__(self, friend_id):
@@ -27,7 +25,7 @@ class VkParser:
 
     def get_messages_from_vk(self) -> None:
         """
-        Обращается к API VK и вытягивает 200 сообщений.
+        Обращается к API VK и вытягивает 200 сообщений, начиная с self.offset_scanned_messages (нулевое сообщение)
         При каждом вызове offset смещается, позволяя запарсить следующие 200 сообщений.
         :return: None
         """
@@ -45,8 +43,7 @@ class VkParser:
 
     def print_parsing_progress_to_console(self) -> None:
         """
-        Печатает в консоль прогресс сканирования сообщений.
-        :return: None
+        Печатает в консоль прогресс сканирования сообщений. При дублировании значения пропускает печать
         """
         if self.now_scanned > self.total_messages:
             self.now_scanned = self.total_messages
@@ -56,7 +53,6 @@ class VkParser:
     def run(self) -> None:
         """
         Основная функция, запускает парсинг сообщений, выжидая между парсингом определённое время и печатая статистику.
-        :return: None
         """
         while self.offset_scanned_messages <= self.total_messages:
             self.get_messages_from_vk()
