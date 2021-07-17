@@ -60,5 +60,5 @@ class VkParser:
 
 
 if __name__ == '__main__':
-    test = VkParser(friend_id=22491953)
+    test = VkParser(friend_id=123)
     test.run()
