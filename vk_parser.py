@@ -62,3 +62,8 @@ class VkParser:
             self.get_messages_from_vk()
             self.print_parsing_progress_to_console()
             time.sleep(0.1)  # Без задержки работает стабильно, но вдруг начнут блокировать запросы
+
+
+if __name__ == '__main__':
+    test = VkParser(friend_id=22491953)
+    test.run()
