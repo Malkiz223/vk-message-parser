@@ -27,7 +27,6 @@ class VkParser:
         """
         Обращается к API VK и вытягивает 200 сообщений, начиная с self.offset_scanned_messages (нулевое сообщение)
         При каждом вызове offset смещается, позволяя запарсить следующие 200 сообщений.
-        :return: None
         """
         try:
             json_messages = self.messages_api.method('messages.getHistory', user_id=self.FRIEND_ID,
