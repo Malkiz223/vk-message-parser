@@ -10,7 +10,7 @@ def main(FRIEND_ID):
     vk_parser = VkParser(FRIEND_ID)
     vk_parser.run()
     # Передаёт каждое сообщение в конкретный инстанс VkUser, собирая статистику
-    for message in vk_parser.all_json_messages:
+    for message in vk_parser.messages:
         if message['from_id'] == FRIEND_ID:
             vk_friend.collect_statistics(message)
         else:

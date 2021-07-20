@@ -17,7 +17,7 @@ class VkParser:
         self.messages_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD, two_factor=True,
                                         cookies_save_path='sessions/')
         self.FRIEND_ID = friend_id
-        self.all_json_messages = []
+        self.messages = []
         self.SCAN_MESSAGES_PER_CALL = 200
         self.offset_scanned_messages = 0
         self.count_messages_was_printed = 0
@@ -34,7 +34,7 @@ class VkParser:
                                                      count=self.SCAN_MESSAGES_PER_CALL,
                                                      rev=-1, offset=self.offset_scanned_messages)
             for message in json_messages['items']:
-                self.all_json_messages.append(message)
+                self.messages.append(message)
             self.offset_scanned_messages += self.SCAN_MESSAGES_PER_CALL
         except (BaseException, AttributeError):
             pass
