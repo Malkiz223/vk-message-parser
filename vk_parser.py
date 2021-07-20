@@ -187,5 +187,9 @@ class VkParser:
 
 
 if __name__ == '__main__':
-    test = VkParser(friend_id=123)
-    test.run()
+    friend_id = 123
+    parser = VkParser(friend_id=friend_id)
+    parser.run()
+    # with open(f'messages_with_{friend_id}.txt', 'w') as file:
+    #     for message2 in parser.all_json_messages:
+    #         file.write(json.dumps(message2) + '\n')
