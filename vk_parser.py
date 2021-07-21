@@ -135,40 +135,52 @@ class VkParser:
             print(type(message))
         return True
 
-    def _save_photo_to_db(self):
+    @staticmethod
+    def _save_photo_to_db(message_id, attachment):
         pass
 
-    def _save_sticker_to_db(self):
+    @staticmethod
+    def _save_sticker_to_db(message_id, attachment):
         pass
 
-    def _save_link_to_db(self):
+    @staticmethod
+    def _save_link_to_db(message_id, attachment):
         pass
 
-    def _save_video_to_db(self):
+    @staticmethod
+    def _save_video_to_db(message_id, attachment):
         pass
 
-    def _save_doc_to_db(self):
+    @staticmethod
+    def _save_doc_to_db(message_id, attachment):
         pass
 
-    def _save_audio_to_db(self):
+    @staticmethod
+    def _save_audio_to_db(message_id, attachment):
         pass
 
-    def _save_audio_message_to_db(self):
+    @staticmethod
+    def _save_audio_message_to_db(message_id, attachment):
         pass
 
-    def _save_call_to_db(self):
+    @staticmethod
+    def _save_call_to_db(message_id, attachment):
         pass
 
-    def _save_gift_to_db(self):
+    @staticmethod
+    def _save_gift_to_db(message_id, attachment):
         pass
 
-    def _save_wall_to_db(self):
+    @staticmethod
+    def _save_wall_to_db(message_id, attachment):
         pass
 
-    def _save_graffiti_to_db(self):
+    @staticmethod
+    def _save_graffiti_to_db(message_id, attachment):
         pass
 
-    def _save_story_to_db(self):
+    @staticmethod
+    def _save_story_to_db(message_id, attachment):
         pass
 
     def run(self) -> None:
