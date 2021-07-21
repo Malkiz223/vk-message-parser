@@ -101,7 +101,7 @@ class VkParser:
         self.offset_scanned_messages = 0
         self.count_messages_was_printed = 0
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
-        self.total_messages = self.messages_api.method('messages.getHistory', user_id=self.FRIEND_ID)['count']
+        self.total_messages = self.vk_api.method('messages.getHistory', user_id=self.FRIEND_ID)['count']
 
     def get_messages_from_vk(self) -> None:
         """
