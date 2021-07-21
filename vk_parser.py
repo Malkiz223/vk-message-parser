@@ -93,9 +93,9 @@ class VkParser:
     def __init__(self, friend_id):
         if not os.path.exists('sessions/'):
             os.mkdir('sessions/')
-        self.messages_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD, two_factor=True,
-                                        cookies_save_path='sessions/')
-        self.FRIEND_ID = friend_id
+        self.vk_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD, two_factor=True,
+                                  cookies_save_path='sessions/')
+
         self.messages = []
         self.SCAN_MESSAGES_PER_CALL = 200
         self.offset_scanned_messages = 0
@@ -109,9 +109,9 @@ class VkParser:
         При каждом вызове offset смещается, позволяя запарсить следующие 200 сообщений.
         """
         try:
-            json_messages = self.messages_api.method('messages.getHistory', user_id=self.FRIEND_ID,
-                                                     count=self.SCAN_MESSAGES_PER_CALL,
-                                                     rev=-1, offset=self.offset_scanned_messages)
+            json_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id,
+                                               count=self.SCAN_MESSAGES_PER_CALL,
+                                               rev=-1, offset=self.offset_scanned_messages)
             for message in json_messages['items']:
                 self.messages.append(message)
             self.offset_scanned_messages += self.SCAN_MESSAGES_PER_CALL
