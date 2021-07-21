@@ -15,9 +15,8 @@ import settings
 Сущность юзеров - ФИО, айдишник, ссылка на профиль? 
 Сущность чата - все данные с месседжа
 
-Основное - сканировать сообщения и класть их в базу. 
-Сделать таблицу юзеров, у юзера есть ФИО во всех падежах, 
-айди_вк (PRIMARY, NOT NULL, UNIQUE)
+Таблица юзеров (users):
+user_id (serial inside database), vk_id, vk_url_nickname (id1 / durov), first_name, last_name
 
 Таблица сообщений (messages):
 id - Primary_key (нет автоинкремента, парсить из message)
@@ -62,7 +61,7 @@ audio_message {'date': 1538992321, 'from_id': 183145350, 'id': 598885, 'out': 0,
 
 Таблица подарков
 message_id foreign_key, gift_id (gift: id), gift_image (gift: thumb_256) (у стикеров ещё stickers_product_id: 127)
-gift {'date': 1539191075, 'from_id': 183145350, 'id': 604783, 'out': 0, 'peer_id': 183145350, 'text': 'Вот раз подарок полюби', 'conversation_message_id': 7196, 'fwd_messages': [], 'important': False, 'random_id': 0, 'attachments': [{'type': 'gift', 'gift': {'id': 975, 'thumb_256': 'https://vk.com/images/gift/975/256.jpg', 'thumb_48': 'https://vk.com/images/gift/975/48.png', 'thumb_96': 'https://vk.com/images/gift/975/96.png'}}], 'is_hidden': False}
+gift [{'type': 'gift', 'gift': {'id': 975, 'thumb_256': 'https://vk.com/images/gift/975/256.jpg', 'thumb_48': 'https://vk.com/images/gift/975/48.png', 'thumb_96': 'https://vk.com/images/gift/975/96.png'}}]
 gift [{'type': 'gift', 'gift': {'id': -127, 'thumb_256': 'https://vk.com/sticker/4-127-256w', 'thumb_48': 'https://vk.com/sticker/4-127-48', 'thumb_96': 'https://vk.com/sticker/4-127-96', 'stickers_product_id': 127}}]
 
 Таблица записей со стены
@@ -74,7 +73,7 @@ message_id foreign_key, owner_id (graffiti: owner_id), url (graffiti: url),
 graffiti {'date': 1546827178, 'from_id': 183145350, 'id': 685265, 'out': 0, 'peer_id': 183145350, 'text': '', 'conversation_message_id': 47129, 'fwd_messages': [], 'important': False, 'random_id': 0, 'attachments': [{'type': 'graffiti', 'graffiti': {'id': 488419242, 'owner_id': 183145350, 'url': 'https://vk.com/doc183145350_488419242?hash=74b1917bf75e297cf4&dl=GIZDIOJRHE2TG:1626646772:2161100a79f5d70f3b&api=1&no_preview=1', 'width': 641, 'height': 720, 'access_key': '55e9a98c34bb11275d'}}], 'is_hidden': False}
 
 Таблица сториз
-message_id foreign_key, owner_id (story: owned_id), date (story: date), expires_at (story: expires_at), is_one_time (story: is_one_time -> True or False) 
+message_id foreign_key, owner_id (story: owned_id), date (story: date), expires_at (story: expires_at), is_one_time (story: is_one_time -> True or False)  
 story {'date': 1598458195, 'from_id': 183145350, 'id': 1084635, 'out': 0, 'peer_id': 183145350, 'text': '', 'conversation_message_id': 245133, 'fwd_messages': [], 'important': False, 'random_id': 0, 'attachments': [{'type': 'story', 'story': {'id': 456239081, 'owner_id': 183145350, 'can_see': 0, 'date': 1598458195, 'expires_at': 1598544595, 'is_one_time': False}}], 'is_hidden': False}
 
 
