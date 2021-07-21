@@ -22,9 +22,7 @@ user_id (serial inside database), vk_id, vk_url_nickname (id1 / durov), first_na
 id - Primary_key (нет автоинкремента, парсить из message)
 date (timestamp - int?) - время сообщения в секундах с начала эпохи
 from_ID (int) - от кого пришло сообщение
-out? (0/1 int?) - 1 - от себя, 0 - от собеседника
 text (text?) - текст сообщения, может быть пустым
-attachment_type (varchar?) - имеет ли вложения, если да, то их тип
 
 
 Таблица фото
