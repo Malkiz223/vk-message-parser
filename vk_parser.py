@@ -1,5 +1,6 @@
 import os
 import time
+from requests.exceptions import ConnectionError
 
 from vk_messages import MessagesAPI
 
@@ -187,6 +188,37 @@ class VkParser:
     def _save_story_to_db(message_id, attachment):
         pass
 
+    def _get_users_name_and_id_data(self, input_id: int or str):
+        """
+        friend_user_data при input_id=1 имеет следующий вид:
+                    [{"first_name": "Павел",
+                     "id": 1,
+                     "last_name": "Дуров",
+                     "can_access_closed": true,
+                     "is_closed": false,
+                     "screen_name": "durov"}]
+        """
+        while True:
+            try:
+                friend_user_data = self.vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
+                self.friend_id = friend_user_data['id']
+                self.friend_url_nickname = friend_user_data['screen_name']
+                self.friend_first_name = friend_user_data['first_name']
+                self.friend_last_name = friend_user_data['last_name']
+                break
+            except ConnectionError:
+                time.sleep(0.1)
+        while True:
+            try:
+                my_user_data = self.vk_api.method('users.get', fields='screen_name')[0]
+                self.my_id = my_user_data['id']
+                self.my_url_nickname = my_user_data['screen_name']
+                self.my_first_name = my_user_data['first_name']
+                self.my_last_name = my_user_data['last_name']
+                break
+            except ConnectionError:
+                time.sleep(0.1)
+
     def run(self) -> None:
         """
         Основная функция, запускает парсинг сообщений, выжидая между парсингом определённое время и печатая статистику.
@@ -202,6 +234,3 @@ if __name__ == '__main__':
     friend_id = 123
     parser = VkParser(friend_id=friend_id)
     parser.run()
-    # with open(f'messages_with_{friend_id}.txt', 'w') as file:
-    #     for message2 in parser.all_json_messages:
-    #         file.write(json.dumps(message2) + '\n')
