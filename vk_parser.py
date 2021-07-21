@@ -131,8 +131,12 @@ class VkParser:
 
     def save_messages_to_db(self) -> bool:
         for message in self.messages:
-            print(message)
-            print(type(message))
+
+            message_id = message['id']
+            if message.get('attachments'):
+                for attachment in message.get('attachments'):
+                    self.save_to_db_methods[attachment['type']](message_id, attachment)
+        del self.messages[:]
         return True
 
     @staticmethod
