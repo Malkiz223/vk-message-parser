@@ -91,7 +91,7 @@ class VkParser:
     Сканирует сообщения с указанным пользователем.
     """
 
-    def __init__(self, friend_id):
+    def __init__(self, friend_id: int or str):
         if not os.path.exists('sessions/'):
             os.mkdir('sessions/')
         self.vk_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD, two_factor=True,
@@ -130,7 +130,7 @@ class VkParser:
             self.count_messages_was_printed = self.now_scanned
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
 
-    def save_messages_to_db(self) -> bool:
+    def save_messages_to_db(self) -> None:
         for message in self.messages:
 
             message_id = message['id']
