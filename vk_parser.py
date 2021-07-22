@@ -5,7 +5,6 @@ from datetime import datetime
 import psycopg2
 from psycopg2._psycopg import connection
 from requests.exceptions import ConnectionError
-
 from vk_messages import MessagesAPI
 
 import settings
@@ -111,76 +110,97 @@ class VkParser:
                         print(f'[ERR] Не вставили значение в базу, пропускаем: {attachment}')
         self.connection.commit()
         del self.messages[:]
-        return True
 
-    @staticmethod
-    def _save_photo_to_db(message_id, attachment):
-        pass
+    def _save_photo_to_db(self, message_id: int, attachment: dict) -> None:
+        photo_url: str = attachment['sizes'][-1]['url']
+        self.cursor.execute('INSERT INTO photos (message_id, image_url) VALUES (%s, %s)', (message_id, photo_url,))
 
-    @staticmethod
-    def _save_sticker_to_db(message_id, attachment):
-        pass
+    def _save_sticker_to_db(self, message_id: int, attachment: dict) -> None:
+        product_id: int = attachment['product_id']
+        sticker_id: int = attachment['sticker_id']
+        image_url: str = f'https://vk.com/sticker/1-{sticker_id}-512'
+        self.cursor.execute('INSERT INTO stickers (message_id, product_id, sticker_id, image_url) '
+                            'VALUES (%s, %s, %s, %s)', (message_id, product_id, sticker_id, image_url,))
 
-    @staticmethod
-    def _save_link_to_db(message_id, attachment):
-        pass
+    def _save_link_to_db(self, message_id: int, attachment: dict) -> None:
+        title: str = attachment['title']
+        url: str = attachment['url']
+        self.cursor.execute('INSERT INTO links (message_id, title, url) VALUES (%s, %s, %s)', (message_id, title, url))
 
-    @staticmethod
-    def _save_video_to_db(message_id, attachment):
-        pass
+    def _save_video_to_db(self, message_id: int, attachment: dict) -> None:
+        description: str = attachment.get('description')
+        duration: int = attachment['duration']
+        image_url: str = attachment['image'][-1]['url']
+        self.cursor.execute('INSERT INTO videos (message_id, description, duration, image_url) VALUES (%s, %s, %s, %s)',
+                            (message_id, description, duration, image_url,))
 
-    @staticmethod
-    def _save_doc_to_db(message_id, attachment):
-        pass
+    def _save_doc_to_db(self, message_id: int, attachment: dict) -> None:
+        title: str = attachment['title']
+        extension: str = attachment['ext']
+        url: str = attachment['url']
+        self.cursor.execute('INSERT INTO docs (message_id, title, extension, url) VALUES (%s, %s, %s, %s)',
+                            (message_id, title, extension, url,))
 
-    @staticmethod
-    def _save_audio_to_db(message_id, attachment):
-        pass
+    def _save_audio_to_db(self, message_id: int, attachment: dict) -> None:
+        artist: str = attachment['artist']
+        title: str = attachment['title']
+        duration: int = attachment['duration']
+        url: str = attachment['url']
+        self.cursor.execute('INSERT INTO audios (message_id, artist, title, duration, url) VALUES (%s, %s, %s, %s, %s)',
+                            (message_id, artist, title, duration, url,))
 
-    @staticmethod
-    def _save_audio_message_to_db(message_id, attachment):
-        pass
+    def _save_audio_message_to_db(self, message_id: int, attachment: dict) -> None:
+        duration: str = attachment['duration']
+        link_ogg: str = attachment['link_ogg']
+        link_mp3: str = attachment['link_mp3']
+        transcript: str = attachment.get('transcript')
+        self.cursor.execute('INSERT INTO audio_messages (message_id, duration, link_ogg, link_mp3, transcript) VALUES ('
+                            '%s, %s, %s, %s, %s)', (message_id, duration, link_ogg, link_mp3, transcript,))
 
-    @staticmethod
-    def _save_call_to_db(message_id, attachment):
-        pass
+    def _save_call_to_db(self, message_id: int, attachment: dict) -> None:
+        initiator_id: int = attachment['initiator_id']
+        state: str = attachment['state']
+        video: bool = attachment['video']
+        self.cursor.execute('INSERT INTO calls (message_id, initiator_id, state, video) VALUES (%s, %s, %s, %s)',
+                            (message_id, initiator_id, state, video,))
 
-    @staticmethod
-    def _save_gift_to_db(message_id, attachment):
-        pass
+    def _save_gift_to_db(self, message_id: int, attachment: dict) -> None:
+        gift_id: int = attachment['id']
+        image_url: str = attachment['thumb_256']
+        stickers_product_id: int = attachment.get('stickers_product_id')
+        self.cursor.execute('INSERT INTO gifts (message_id, gift_id, image_url, stickers_product_id) VALUES ('
+                            '%s, %s, %s, %s)', (message_id, gift_id, image_url, stickers_product_id,))
 
-    @staticmethod
-    def _save_wall_to_db(message_id, attachment):
-        pass
+    def _save_wall_to_db(self, message_id: int, attachment: dict) -> None:
+        from_id: int = attachment['from_id']
+        post_date_gmt: datetime = datetime.fromtimestamp(attachment['date'])
+        post_type: str = attachment['post_type']
+        text: str = attachment['text']
+        self.cursor.execute('INSERT INTO walls (message_id, from_id, post_date_gmt, post_type, text) VALUES ('
+                            '%s, %s, %s, %s, %s)', (message_id, from_id, post_date_gmt, post_type, text,))
 
-    @staticmethod
-    def _save_graffiti_to_db(message_id, attachment):
-        pass
+    def _save_graffiti_to_db(self, message_id: int, attachment: dict) -> None:
+        image_url: str = attachment['url']
+        self.cursor.execute('INSERT INTO graffiti (message_id, image_url) VALUES (%s, %s)', (message_id, image_url,))
 
-    @staticmethod
-    def _save_story_to_db(message_id, attachment):
-        pass
+    def _save_story_to_db(self, message_id: int, attachment: dict) -> None:
+        can_see: int = attachment['can_see']
+        story_date_gmt: datetime = datetime.fromtimestamp(attachment['date'])
+        expires_at_gmt: datetime = datetime.fromtimestamp(attachment['expires_at'])
+        is_one_time: bool = attachment['is_one_time']
+        self.cursor.execute('INSERT INTO stories (message_id, can_see, story_date_gmt, expires_at_gmt, is_one_time) '
+                            'VALUES (%s, %s, %s, %s, %s)',
+                            (message_id, can_see, story_date_gmt, expires_at_gmt, is_one_time,))
+
+    def _save_users_to_db(self) -> None:
+        sql_insert_into_users = ('INSERT INTO users (vk_id, vk_url_nickname, vk_first_name, vk_last_name) '
+                                 'VALUES (%s, %s, %s, %s) ON CONFLICT (vk_url_nickname) DO NOTHING')
+        users = [(self.my_id, self.my_url_nickname, self.my_first_name, self.my_last_name),
+                 (self.friend_id, self.friend_url_nickname, self.friend_first_name, self.friend_last_name)]
+        self.cursor.executemany(sql_insert_into_users, users)
+        self.connection.commit()
 
     def _get_users_name_and_id_data(self, input_id: int or str):
-        """
-        friend_user_data при input_id=1 имеет следующий вид:
-                    [{"first_name": "Павел",
-                     "id": 1,
-                     "last_name": "Дуров",
-                     "can_access_closed": true,
-                     "is_closed": false,
-                     "screen_name": "durov"}]
-        """
-        while True:
-            try:
-                friend_user_data = self.vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
-                self.friend_id = friend_user_data['id']
-                self.friend_url_nickname = friend_user_data['screen_name']
-                self.friend_first_name = friend_user_data['first_name']
-                self.friend_last_name = friend_user_data['last_name']
-                break
-            except ConnectionError:
-                time.sleep(0.1)
         while True:
             try:
                 my_user_data = self.vk_api.method('users.get', fields='screen_name')[0]
