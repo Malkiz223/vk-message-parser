@@ -47,10 +47,10 @@ class VkParser:
             json_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id,
                                                count=self.SCAN_MESSAGES_PER_CALL,
                                                rev=-1, offset=self.offset_scanned_messages)
-            for message in json_messages['items']:
-                self.messages.append(message)
+            self.messages.append(message for message in json_messages['items'])
             self.offset_scanned_messages += self.SCAN_MESSAGES_PER_CALL
-        except (BaseException, AttributeError):
+        # except (BaseException, AttributeError):  # не знаю, зачем тут BaseException, давненько писал этот кусок
+        except AttributeError:
             pass
 
     def print_parsing_progress_to_console(self) -> None:
