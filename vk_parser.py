@@ -1,5 +1,9 @@
 import os
 import time
+from datetime import datetime
+
+import psycopg2
+from psycopg2._psycopg import connection
 from requests.exceptions import ConnectionError
 
 from vk_messages import MessagesAPI
@@ -94,9 +98,11 @@ class VkParser:
     def __init__(self, friend_id: int or str):
         if not os.path.exists('sessions/'):
             os.mkdir('sessions/')
-        self.vk_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD, two_factor=True,
-                                  cookies_save_path='sessions/')
-
+        self.vk_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD,
+                                  two_factor=True, cookies_save_path='sessions/')
+        self.connection: connection = psycopg2.connect(user='postgres', password=os.getenv('POSTGRESQL_PASSWORD'),
+                                                       database='vk_messages', host='127.0.0.1', port=5432)
+        self.cursor = self.connection.cursor()
         self.messages = []
         self.SCAN_MESSAGES_PER_CALL = 200
         self.offset_scanned_messages = 0
@@ -228,6 +234,11 @@ class VkParser:
             self.save_messages_to_db()
             self.print_parsing_progress_to_console()
             time.sleep(0.1)  # Без задержки работает стабильно, но вдруг начнут блокировать запросы
+
+    def __del__(self) -> None:
+        if self.connection:
+            self.cursor.close()
+            self.connection.close()
 
 
 if __name__ == '__main__':
