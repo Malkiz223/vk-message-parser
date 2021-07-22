@@ -69,10 +69,10 @@ class VkParser:
             json_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id,
                                                count=self.SCAN_MESSAGES_PER_CALL,
                                                rev=-1, offset=self.offset_scanned_messages)
-            self.messages.append(message for message in json_messages['items'])
+            for message in json_messages['items']:
+                self.messages.append(message)
             self.offset_scanned_messages += self.SCAN_MESSAGES_PER_CALL
-        # except (BaseException, AttributeError):  # не знаю, зачем тут BaseException, давненько писал этот кусок
-        except AttributeError:
+        except (ConnectionError, AttributeError):  # раньше вместо ConnectionError был BaseException
             pass
 
     def print_parsing_progress_to_console(self) -> None:
@@ -209,7 +209,7 @@ class VkParser:
                 self.my_first_name = my_user_data['first_name']
                 self.my_last_name = my_user_data['last_name']
                 break
-            except ConnectionError:
+            except (ConnectionError, AttributeError):
                 time.sleep(0.2)
         while True:
             try:
@@ -219,7 +219,7 @@ class VkParser:
                 self.friend_first_name = friend_user_data['first_name']
                 self.friend_last_name = friend_user_data['last_name']
                 break
-            except ConnectionError:
+            except (ConnectionError, AttributeError):
                 time.sleep(0.2)
 
     def run(self) -> None:
@@ -239,6 +239,6 @@ class VkParser:
 
 
 if __name__ == '__main__':
-    friend_id = 123
+    friend_id = 1  # int or str (1 or 'durov')
     parser = VkParser(friend_id=friend_id)
     parser.run()
