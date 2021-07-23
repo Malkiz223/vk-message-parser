@@ -20,6 +20,15 @@ import settings
 # TODO зайти под сессией на сайт вк и распарсить всех собеседников?
 
 
+"""
+Сканировать суммарное количество сообщений с пользователем
+Сканировать значение уже записанных строк в базу
+Сканировать минимальный id сообщения с пользователем (select message_id where chat_id = friend_id)
+При создании инстанса класса проверять значения, указанные выше и добавлять в переменную?
+Писать в консоль 
+"""
+
+
 class VkParser:
     """
     Сканирует сообщения с указанным пользователем.
@@ -56,12 +65,9 @@ class VkParser:
         # получаем self.(friend_id, friend_url_nickname, friend_first_name, friend_last_name) и аналогично с self.my_...
         self._get_users_name_and_id_data(friend_id)
         self._save_users_to_db()
-        while True:
-            try:
-                self.total_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
-                break
-            except ConnectionError:  # иногда сервер ВК банит частые запросы и скрипт падает
-                time.sleep(0.2)
+        self.total_messages, self.messages_before_scanned,  = self._get_messages_statistic()
+        total_was_scanned = self.messages_scanned_before
+        messages_left_to_scan = self.total_messages - self.messages_scanned_before
 
     def get_messages_from_vk(self) -> None:
         """
@@ -71,7 +77,10 @@ class VkParser:
         try:
             json_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id,
                                                count=self.SCAN_MESSAGES_PER_CALL,
-                                               rev=-1, offset=self.offset_scanned_messages)
+                                               offset=self.offset_scanned_messages,
+                                               start_message_id=self.last_scanned_id - 1)
+            if len(json_messages['items']) < 200:
+                print('Достигли верха сообщений')
             for message in json_messages['items']:
                 self.messages.append(message)
             self.offset_scanned_messages += self.SCAN_MESSAGES_PER_CALL
@@ -82,10 +91,10 @@ class VkParser:
         """
         Печатает в консоль прогресс сканирования сообщений. При дублировании значения пропускает печать.
         """
-        if self.now_scanned > self.total_messages:
-            self.now_scanned = self.total_messages  # чтобы не превышало верхний предел сообщений
+        if self.now_scanned > self.messages_left_to_scan:
+            self.now_scanned = self.messages_left_to_scan  # чтобы не превышало верхний предел сообщений
         if self.count_messages_was_printed < self.now_scanned:  # если уже печатало данное количество - скипаем
-            print(f'Просканировано {self.now_scanned} из {self.total_messages} сообщений')
+            print(f'Просканировано {self.now_scanned} из {self.messages_left_to_scan} сообщений')
             self.count_messages_was_printed = self.now_scanned
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
 
@@ -225,11 +234,29 @@ class VkParser:
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
 
+    def _get_chat_statistic(self):
+        """
+        messages_scanned_before - количество сообщений, просканированных ранее (чтобы не начинать сначала)
+        total_messages - всего сообщений с пользователем
+        """
+        while True:
+            try:
+                total_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
+                break
+            except ConnectionError:  # иногда сервер ВК банит частые запросы и скрипт падает
+                time.sleep(0.2)
+        self.cursor.execute('SELECT COUNT(*) FROM messages WHERE chat_id = %s', (self.friend_id,))
+        messages_scanned_before = int(self.cursor.fetchone()[0])
+        self.cursor.execute('SELECT MIN(message_id) FROM messages WHERE chat_id = %s', (self.friend_id,))
+        last_scanned_id = self.cursor.fetchone()[0]
+        last_scanned_id = 0 if last_scanned_id is None else last_scanned_id
+        return total_messages, messages_scanned_before, last_scanned_id
+
     def run(self) -> None:
         """
         Основная функция, запускает парсинг сообщений, выжидая между парсингом определённое время и печатая статистику.
         """
-        while self.offset_scanned_messages <= self.total_messages:
+        while self.offset_scanned_messages <= self.messages_left_to_scan:
             self.get_messages_from_vk()
             self.save_messages_to_db()
             self.print_parsing_progress_to_console()
