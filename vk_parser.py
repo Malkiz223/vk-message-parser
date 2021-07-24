@@ -12,7 +12,9 @@ import settings
 
 class VkParser:
     """
-    Сканирует сообщения с указанным пользователем.
+    Сканирует сообщения с указанным пользователем и сохраняет их в заранее созданную PostgreSQL базу.
+    Скрипт создания таблиц лежит в database/create_db.py.
+    Может сканировать пользователей как по числовому, так и по буквенному ID.
     """
 
     def __init__(self, friend_id: int or str):
@@ -52,8 +54,10 @@ class VkParser:
 
     def get_messages_from_vk(self) -> None:
         """
-        Обращается к API VK и вытягивает 200 сообщений, начиная с self.offset_scanned_messages (нулевое сообщение).
-        Если ошибок не было - offset смещается, позволяя запарсить следующие 200 сообщений.
+        Обращается к API VK и вытягивает 200 сообщений. Если сообщений с этим пользователем не было в базе (проверяется
+        в self.last_scanned_id), то парсит с самого начала. Если сообщения были - начинает парсить с N + 1.
+        Если ошибок не было - offset смещается, позволяя получить следующие 200 сообщений. self.offset отрицательный
+        из-за особенностей получения сообщений через API , т.к. start_message_id и rev (reverse) не работают вместе.
         """
         try:
             json_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id,
@@ -80,6 +84,10 @@ class VkParser:
         self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
 
     def save_messages_to_db(self) -> None:
+        """
+        Берёт сообщения из self.messages, просканированные ранее, и кладёт их в базу. Если в сообщении было вложение -
+        кладёт вложение в таблицу этого типа вложений. Пропускает market в виду малого смысла его использования.
+        """
         for message in self.messages:
             message_id: int = message['id']
             date_gmt: datetime = datetime.fromtimestamp(message['date'])
@@ -121,6 +129,9 @@ class VkParser:
         self.cursor.execute('INSERT INTO links (message_id, title, url) VALUES (%s, %s, %s)', (message_id, title, url))
 
     def _save_video_to_db(self, message_id: int, attachment: dict) -> None:
+        """
+        У видео нет ссылки, даже если оно ведёт на YouTube. Через API его достать нельзя.
+        """
         description: str = attachment.get('description')
         duration: int = attachment['duration']
         image_url: str = attachment['image'][-1]['url']
@@ -186,6 +197,9 @@ class VkParser:
                             (message_id, can_see, story_date_gmt, expires_at_gmt, is_one_time,))
 
     def _save_users_to_db(self) -> None:
+        """
+        Можно класть имена в разных падежах, их можно вытянуть через API VK.
+        """
         sql_insert_into_users = ('INSERT INTO users (vk_id, vk_url_nickname, vk_first_name, vk_last_name) '
                                  'VALUES (%s, %s, %s, %s) ON CONFLICT (vk_url_nickname) DO NOTHING')
         users = [(self.my_id, self.my_url_nickname, self.my_first_name, self.my_last_name),
@@ -193,7 +207,11 @@ class VkParser:
         self.cursor.executemany(sql_insert_into_users, users)
         self.connection.commit()
 
-    def _get_users_name_and_id_data(self, input_id: int or str):
+    def _get_user_data(self, input_id: int or str = ''):
+        """
+        В случае input_id="" (не None) достаются данные своего аккаунта. fields='screen_name' - псевдоним страницы,
+        идущий после https://vk.com/. Замена id12345 либо сама строка id12345 при отсутствии псевдонима.
+        """
         while True:
             try:
                 my_user_data = self.vk_api.method('users.get', fields='screen_name')[0]
@@ -217,8 +235,9 @@ class VkParser:
 
     def _get_chat_statistic(self):
         """
-        messages_scanned_before - количество сообщений, просканированных ранее (чтобы не начинать сначала)
         total_messages - всего сообщений с пользователем
+        messages_scanned_before - количество сообщений, просканированных ранее (чтобы не начинать сначала).
+        last_scanned_id - последний айдишник сообщения в базе (меняется на 1 при отсутствии сообщений в базе).
         """
         while True:
             try:
@@ -235,7 +254,7 @@ class VkParser:
 
     def run(self) -> None:
         """
-        Основная функция, запускает парсинг сообщений, выжидая между парсингом определённое время и печатая статистику.
+        Основная функция, запускает парсинг сообщений, сохраняет сообщения в базу, печатая прогресс сканирования.
         """
         while self.offset_scanned_messages <= self.messages_left_to_scan:
             self.get_messages_from_vk()
