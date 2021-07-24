@@ -9,20 +9,12 @@ from vk_messages import MessagesAPI
 
 import settings
 
-# TODO добавить докстринги
-# TODO добавить сканирование с места прерывания
-# TODO добавить возможность сканирования сразу однопоточно сразу нескольких пользователей
-#  или сканирование всех чатов без добавления вручную
-# TODO перевести проект на Flask
-# TODO добавить поддержку другой базы с автосозданием? сканировать наличие базы PostgreSQL
-
-# TODO в прогресс добавлять не оффсет, а длинну self.messages
-# TODO зайти под сессией на сайт вк и распарсить всех собеседников?
-
 
 class VkParser:
     """
-    Сканирует сообщения с указанным пользователем.
+    Сканирует сообщения с указанным пользователем и сохраняет их в заранее созданную PostgreSQL базу.
+    Скрипт создания таблиц лежит в database/create_db.py.
+    Может сканировать пользователей как по числовому, так и по буквенному ID.
     """
 
     def __init__(self, friend_id: int or str):
@@ -34,10 +26,9 @@ class VkParser:
                                                        database='vk_messages', host='127.0.0.1', port=5432)
         self.cursor = self.connection.cursor()
         self.messages = []
-        self.SCAN_MESSAGES_PER_CALL = 200
-        self.offset_scanned_messages = 0
-        self.count_messages_was_printed = 0
-        self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
+        self.SCAN_MESSAGES_PER_CALL = 200  # максимум, что позволяет API VK
+        self.offset_scanned_messages = -200  # отрицательный offset в силу особенностей API VK
+        # реализовано для удобного вызова функций по типу вложения - вместо if/elif
         self.save_to_db_methods = {
             'photo': self._save_photo_to_db,
             'sticker': self._save_sticker_to_db,
@@ -53,43 +44,50 @@ class VkParser:
             'story': self._save_story_to_db,
         }
 
-        # получаем self.(friend_id, friend_url_nickname, friend_first_name, friend_last_name) и аналогично с self.my_...
-        self._get_users_name_and_id_data(friend_id)
+        self.my_id, self.my_url_nickname, self.my_first_name, self.my_last_name = self._get_user_data()
+        self.friend_id, self.friend_url_nickname, self.friend_first_name, self.friend_last_name = self._get_user_data(
+            friend_id)
         self._save_users_to_db()
-        while True:
-            try:
-                self.total_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
-                break
-            except ConnectionError:  # иногда сервер ВК банит частые запросы и скрипт падает
-                time.sleep(0.2)
+
+        self.total_messages, self.messages_scanned_before, self.last_scanned_id = self._get_chat_statistic()
+        self.messages_was_scanned = self.messages_scanned_before
+        self.count_messages_was_printed = self.messages_scanned_before
 
     def get_messages_from_vk(self) -> None:
         """
-        Обращается к API VK и вытягивает 200 сообщений, начиная с self.offset_scanned_messages (нулевое сообщение).
-        Если ошибок не было - offset смещается, позволяя запарсить следующие 200 сообщений.
+        Обращается к API VK и вытягивает 200 сообщений. Если сообщений с этим пользователем не было в базе (проверяется
+        в self.last_scanned_id), то парсит с самого начала. Если сообщения были - начинает парсить с N + 1.
+        Если ошибок не было - offset смещается, позволяя получить следующие 200 сообщений. self.offset отрицательный
+        из-за особенностей получения сообщений через API , т.к. start_message_id и rev (reverse) не работают вместе.
         """
         try:
             json_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id,
                                                count=self.SCAN_MESSAGES_PER_CALL,
-                                               rev=-1, offset=self.offset_scanned_messages)
+                                               offset=self.offset_scanned_messages,
+                                               start_message_id=self.last_scanned_id)
+            json_messages['items'] = json_messages['items'][::-1]
             for message in json_messages['items']:
                 self.messages.append(message)
-            self.offset_scanned_messages += self.SCAN_MESSAGES_PER_CALL
-        except (ConnectionError, AttributeError):  # раньше вместо ConnectionError был BaseException
-            pass
+            self.offset_scanned_messages -= self.SCAN_MESSAGES_PER_CALL
+        except (ConnectionError, AttributeError):  # скрипт всегда падает без этой обработки исключений
+            time.sleep(0.1)
 
     def print_parsing_progress_to_console(self) -> None:
         """
         Печатает в консоль прогресс сканирования сообщений. При дублировании значения пропускает печать.
         """
-        if self.now_scanned > self.total_messages:
-            self.now_scanned = self.total_messages  # чтобы не превышало верхний предел сообщений
-        if self.count_messages_was_printed < self.now_scanned:  # если уже печатало данное количество - скипаем
-            print(f'Просканировано {self.now_scanned} из {self.total_messages} сообщений')
-            self.count_messages_was_printed = self.now_scanned
-        self.now_scanned = self.SCAN_MESSAGES_PER_CALL + self.offset_scanned_messages
+        self.messages_was_scanned += len(self.messages)
+        if self.messages_was_scanned > self.total_messages:  # чтобы не превышало верхний предел сообщений
+            self.messages_was_scanned = self.total_messages
+        if self.count_messages_was_printed < self.messages_was_scanned:  # если уже печатало данное количество - скипаем
+            print(f'Просканировано {self.messages_was_scanned} из {self.total_messages} сообщений')
+            self.count_messages_was_printed = self.messages_was_scanned  # иначе дублирует печать
 
     def save_messages_to_db(self) -> None:
+        """
+        Берёт сообщения из self.messages, просканированные ранее, и кладёт их в базу. Если в сообщении было вложение -
+        кладёт вложение в таблицу этого типа вложений. Пропускает market в виду малого смысла его использования.
+        """
         for message in self.messages:
             message_id: int = message['id']
             date_gmt: datetime = datetime.fromtimestamp(message['date'])
@@ -104,15 +102,14 @@ class VkParser:
             if self.cursor.statusmessage == 'INSERT 0 1':  # если значение вставлено успешно
                 for attachment in message.get('attachments'):
                     attachment_type: str = attachment['type']
-                    if attachment_type == 'market':
+                    if attachment_type == 'market':  # можно класть и маркет в базу, но смысла мало
                         continue
                     try:
                         # в зависимости от типа вложения запускается нужный метод, см. __init__.self.save_to_db_methods
                         self.save_to_db_methods[attachment_type](message['id'], attachment[attachment_type])
-                    except TypeError:
+                    except TypeError:  # если в будущих версиях VK появятся новые типы вложений
                         print(f'[ERR] Не вставили значение в базу, пропускаем: {attachment}')
         self.connection.commit()
-        del self.messages[:]
 
     def _save_photo_to_db(self, message_id: int, attachment: dict) -> None:
         photo_url: str = attachment['sizes'][-1]['url']
@@ -121,7 +118,7 @@ class VkParser:
     def _save_sticker_to_db(self, message_id: int, attachment: dict) -> None:
         product_id: int = attachment['product_id']
         sticker_id: int = attachment['sticker_id']
-        image_url: str = f'https://vk.com/sticker/1-{sticker_id}-512'
+        image_url: str = f'https://vk.com/sticker/1-{sticker_id}-512'  # 512 ширина/высота стикера, есть 64/128/256/512
         self.cursor.execute('INSERT INTO stickers (message_id, product_id, sticker_id, image_url) '
                             'VALUES (%s, %s, %s, %s)', (message_id, product_id, sticker_id, image_url,))
 
@@ -131,6 +128,9 @@ class VkParser:
         self.cursor.execute('INSERT INTO links (message_id, title, url) VALUES (%s, %s, %s)', (message_id, title, url))
 
     def _save_video_to_db(self, message_id: int, attachment: dict) -> None:
+        """
+        У видео нет ссылки, даже если оно ведёт на YouTube. Через API его достать нельзя.
+        """
         description: str = attachment.get('description')
         duration: int = attachment['duration']
         image_url: str = attachment['image'][-1]['url']
@@ -148,7 +148,7 @@ class VkParser:
         artist: str = attachment['artist']
         title: str = attachment['title']
         duration: int = attachment['duration']
-        url: str = attachment['url']
+        url: str = attachment['url']  # url аудио позволяет скачать какую-то непонятную фигню формата .m3u8
         self.cursor.execute('INSERT INTO audios (message_id, artist, title, duration, url) VALUES (%s, %s, %s, %s, %s)',
                             (message_id, artist, title, duration, url,))
 
@@ -156,7 +156,7 @@ class VkParser:
         duration: str = attachment['duration']
         link_ogg: str = attachment['link_ogg']
         link_mp3: str = attachment['link_mp3']
-        transcript: str = attachment.get('transcript')
+        transcript: str = attachment.get('transcript')  # транскрипт отсутствует у старых сообщений, положится null
         self.cursor.execute('INSERT INTO audio_messages (message_id, duration, link_ogg, link_mp3, transcript) VALUES ('
                             '%s, %s, %s, %s, %s)', (message_id, duration, link_ogg, link_mp3, transcript,))
 
@@ -190,12 +190,15 @@ class VkParser:
         can_see: int = attachment['can_see']
         story_date_gmt: datetime = datetime.fromtimestamp(attachment['date'])
         expires_at_gmt: datetime = datetime.fromtimestamp(attachment['expires_at'])
-        is_one_time: bool = attachment['is_one_time']
+        is_one_time: bool = attachment['is_one_time']  # на моей практике здесь всегда лежит False
         self.cursor.execute('INSERT INTO stories (message_id, can_see, story_date_gmt, expires_at_gmt, is_one_time) '
                             'VALUES (%s, %s, %s, %s, %s)',
                             (message_id, can_see, story_date_gmt, expires_at_gmt, is_one_time,))
 
     def _save_users_to_db(self) -> None:
+        """
+        Можно класть имена в разных падежах, их можно вытянуть через API VK.
+        """
         sql_insert_into_users = ('INSERT INTO users (vk_id, vk_url_nickname, vk_first_name, vk_last_name) '
                                  'VALUES (%s, %s, %s, %s) ON CONFLICT (vk_url_nickname) DO NOTHING')
         users = [(self.my_id, self.my_url_nickname, self.my_first_name, self.my_last_name),
@@ -203,37 +206,52 @@ class VkParser:
         self.cursor.executemany(sql_insert_into_users, users)
         self.connection.commit()
 
-    def _get_users_name_and_id_data(self, input_id: int or str):
+    def _get_user_data(self, input_id: int or str = ''):
+        """
+        В случае input_id="" (не None) достаются данные своего аккаунта. fields='screen_name' - псевдоним страницы,
+        идущий после https://vk.com/. Замена id12345 либо сама строка id12345 при отсутствии псевдонима.
+        """
         while True:
             try:
-                my_user_data = self.vk_api.method('users.get', fields='screen_name')[0]
-                self.my_id = my_user_data['id']
-                self.my_url_nickname = my_user_data['screen_name']
-                self.my_first_name = my_user_data['first_name']
-                self.my_last_name = my_user_data['last_name']
-                break
-            except (ConnectionError, AttributeError):
-                time.sleep(0.2)
-        while True:
-            try:
-                friend_user_data = self.vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
-                self.friend_id = friend_user_data['id']
-                self.friend_url_nickname = friend_user_data['screen_name']
-                self.friend_first_name = friend_user_data['first_name']
-                self.friend_last_name = friend_user_data['last_name']
-                break
+                user_data = self.vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
+                user_id = user_data['id']
+                user_url_nickname = user_data['screen_name']
+                user_first_name = user_data['first_name']
+                user_last_name = user_data['last_name']
+                return user_id, user_url_nickname, user_first_name, user_last_name
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
 
+    def _get_chat_statistic(self):
+        """
+        total_messages - всего сообщений с пользователем
+        messages_scanned_before - количество сообщений, просканированных ранее (чтобы не начинать сначала).
+        last_scanned_id - последний айдишник сообщения в базе (меняется на 1 при отсутствии сообщений в базе).
+        """
+        while True:
+            try:
+                total_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
+                break
+            except (ConnectionError, AttributeError):
+                time.sleep(0.2)
+        self.cursor.execute('SELECT COUNT(*) FROM messages WHERE chat_id = %s', (self.friend_id,))
+        messages_scanned_before = self.cursor.fetchone()[0]
+        self.cursor.execute('SELECT MAX(message_id) FROM messages WHERE chat_id = %s', (self.friend_id,))
+        last_scanned_id = self.cursor.fetchone()[0]
+        last_scanned_id = 1 if last_scanned_id is None else last_scanned_id
+        return total_messages, messages_scanned_before, last_scanned_id
+
     def run(self) -> None:
         """
-        Основная функция, запускает парсинг сообщений, выжидая между парсингом определённое время и печатая статистику.
+        Основная функция, запускает парсинг сообщений, сохраняет сообщения в базу, печатая прогресс сканирования.
         """
-        while self.offset_scanned_messages <= self.total_messages:
+        while self.messages_was_scanned < self.total_messages:
             self.get_messages_from_vk()
             self.save_messages_to_db()
             self.print_parsing_progress_to_console()
-            time.sleep(0.1)  # Без задержки работает стабильно, но вдруг начнут блокировать запросы
+            del self.messages[:]  #
+        else:
+            print(f'Сообщения с пользователем {self.friend_first_name} {self.friend_last_name} просканированы')
 
     def __del__(self) -> None:
         if self.connection:
