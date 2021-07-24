@@ -102,12 +102,12 @@ class VkParser:
             if self.cursor.statusmessage == 'INSERT 0 1':  # если значение вставлено успешно
                 for attachment in message.get('attachments'):
                     attachment_type: str = attachment['type']
-                    if attachment_type == 'market':
+                    if attachment_type == 'market':  # можно класть и маркет в базу, но смысла мало
                         continue
                     try:
                         # в зависимости от типа вложения запускается нужный метод, см. __init__.self.save_to_db_methods
                         self.save_to_db_methods[attachment_type](message['id'], attachment[attachment_type])
-                    except TypeError:
+                    except TypeError:  # если в будущих версиях VK появятся новые типы вложений
                         print(f'[ERR] Не вставили значение в базу, пропускаем: {attachment}')
         self.connection.commit()
 
@@ -118,7 +118,7 @@ class VkParser:
     def _save_sticker_to_db(self, message_id: int, attachment: dict) -> None:
         product_id: int = attachment['product_id']
         sticker_id: int = attachment['sticker_id']
-        image_url: str = f'https://vk.com/sticker/1-{sticker_id}-512'
+        image_url: str = f'https://vk.com/sticker/1-{sticker_id}-512'  # 512 ширина/высота стикера, есть 64/128/256/512
         self.cursor.execute('INSERT INTO stickers (message_id, product_id, sticker_id, image_url) '
                             'VALUES (%s, %s, %s, %s)', (message_id, product_id, sticker_id, image_url,))
 
@@ -148,7 +148,7 @@ class VkParser:
         artist: str = attachment['artist']
         title: str = attachment['title']
         duration: int = attachment['duration']
-        url: str = attachment['url']
+        url: str = attachment['url']  # url аудио позволяет скачать какую-то непонятную фигню формата .m3u8
         self.cursor.execute('INSERT INTO audios (message_id, artist, title, duration, url) VALUES (%s, %s, %s, %s, %s)',
                             (message_id, artist, title, duration, url,))
 
@@ -156,7 +156,7 @@ class VkParser:
         duration: str = attachment['duration']
         link_ogg: str = attachment['link_ogg']
         link_mp3: str = attachment['link_mp3']
-        transcript: str = attachment.get('transcript')
+        transcript: str = attachment.get('transcript')  # транскрипт отсутствует у старых сообщений, положится null
         self.cursor.execute('INSERT INTO audio_messages (message_id, duration, link_ogg, link_mp3, transcript) VALUES ('
                             '%s, %s, %s, %s, %s)', (message_id, duration, link_ogg, link_mp3, transcript,))
 
@@ -190,7 +190,7 @@ class VkParser:
         can_see: int = attachment['can_see']
         story_date_gmt: datetime = datetime.fromtimestamp(attachment['date'])
         expires_at_gmt: datetime = datetime.fromtimestamp(attachment['expires_at'])
-        is_one_time: bool = attachment['is_one_time']
+        is_one_time: bool = attachment['is_one_time']  # на моей практике здесь всегда лежит False
         self.cursor.execute('INSERT INTO stories (message_id, can_see, story_date_gmt, expires_at_gmt, is_one_time) '
                             'VALUES (%s, %s, %s, %s, %s)',
                             (message_id, can_see, story_date_gmt, expires_at_gmt, is_one_time,))
