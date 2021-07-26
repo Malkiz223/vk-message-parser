@@ -1,5 +1,5 @@
 import os
 
-VK_LOGIN = os.getenv('VK_LOGIN')  # str
-VK_PASSWORD = os.getenv('VK_PASSWORD')  # str
-MY_VK_ID = int(os.getenv('MY_VK_ID'))  # int
+VK_LOGIN = os.getenv('VK_LOGIN')  # str, 'admin@gmail.com' as an example
+VK_PASSWORD = os.getenv('VK_PASSWORD')  # str, 'qwerty123' as an example
+TWO_FACTOR = False  # bool, do you have two-factor authentication
