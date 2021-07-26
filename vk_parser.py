@@ -1,11 +1,13 @@
 import os
+import sys
 import time
 from datetime import datetime
 
 import psycopg2
-from psycopg2._psycopg import connection
+from psycopg2._psycopg import connection, cursor
 from requests.exceptions import ConnectionError
 from vk_messages import MessagesAPI
+from vk_messages.vk_messages import Exception_MessagesAPI
 
 import settings
 
@@ -17,18 +19,27 @@ class VkParser:
     Может сканировать пользователей как по числовому, так и по буквенному ID.
     """
 
-    def __init__(self, friend_id: int or str):
+    def __init__(self, friend_id: int or str, two_factor: bool = settings.TWO_FACTOR):
         if not os.path.exists('sessions/'):
             os.mkdir('sessions/')
-        self.vk_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD,
-                                  two_factor=True, cookies_save_path='sessions/')
-        self.connection: connection = psycopg2.connect(user='postgres', password=os.getenv('POSTGRESQL_PASSWORD'),
-                                                       database='vk_messages', host='127.0.0.1', port=5432)
-        self.cursor = self.connection.cursor()
+        try:
+            self.vk_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD,
+                                      two_factor=two_factor, cookies_save_path='sessions/')
+        except Exception_MessagesAPI as e:
+            print(f'Неверный пароль или {"имеется" if two_factor else "отсутствует"} двухфакторная аутентификация.', e)
+            print('Передайте верные аргументы в экземпляр класса VkParser')
+            sys.exit()
+        try:
+            self.connection: connection = psycopg2.connect(user='postgres', password=os.getenv('POSTGRESQL_PASSWORD'),
+                                                           database='vk_messages', host='127.0.0.1', port=5432)
+            self.cursor: cursor = self.connection.cursor()
+        except psycopg2.OperationalError:
+            print(f'Не смогли подключиться к базе PostgreSQL с названием vk_messages')
+            sys.exit()
         self.messages = []
         self.SCAN_MESSAGES_PER_CALL = 200  # максимум, что позволяет API VK
         self.offset_scanned_messages = -200  # отрицательный offset в силу особенностей API VK
-        # реализовано для удобного вызова функций по типу вложения - вместо if/elif
+        # реализовано для удобного вызова функций по типу вложения вместо if/elif
         self.save_to_db_methods = {
             'photo': self._save_photo_to_db,
             'sticker': self._save_sticker_to_db,
@@ -254,12 +265,15 @@ class VkParser:
             print(f'Сообщения с пользователем {self.friend_first_name} {self.friend_last_name} просканированы')
 
     def __del__(self) -> None:
-        if self.connection:
-            self.cursor.close()
-            self.connection.close()
+        try:
+            if self.connection:
+                self.cursor.close()
+                self.connection.close()
+        except AttributeError:
+            pass
 
 
 if __name__ == '__main__':
     friend_id = 1  # int or str (1 or 'durov')
-    parser = VkParser(friend_id=friend_id)
+    parser = VkParser(friend_id=friend_id, two_factor=True)
     parser.run()
