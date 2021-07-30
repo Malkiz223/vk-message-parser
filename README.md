@@ -1,19 +1,50 @@
 # VK message parser
-This script shows statistics of VKontakte messages with your friend.
 
-## Installation
-Open your PyCharm and write to the terminal:
+Лёгкий в использовании скрипт для сбора статистики сообщений во ВКонтакте. Теперь вы сможете легко получить из беседы:
+
+- сообщения и их даты
+- изображения и ссылки на них
+- стикеры и их изображения
+- ссылки на внешние ресурсы
+- видео и их продолжительность
+- документы и ссылок на файлы
+- аудио и их продолжительность
+- аудиозаписи со ссылками для скачивания, их продолжительность и текстовый перевод
+- звонки и их статистику
+- подарки и их изображения, отметки о подаренных стикерах
+- записи со стены
+- граффити в виде изображений
+- истории и их статистика
+
+## Установка и настройка
+
+Скачайте и установите [PostgreSQL](https://www.postgresql.org/download/) (тестировалось на версии 13.3)
+и [Python 3.8+](https://www.python.org/downloads/)
+
+Подключитесь к PostgreSQL и создайте базу с удобным названием. По умолчанию это vk_messages.
+
+В терминале вашей IDE введите следующие команды, чтобы клонировать репозиторий и установить зависимости:
+
 ```
 git clone https://github.com/Malkiz223/vk-message-parser && cd vk-message-parser
 ```
+
 ```
 pip install -r requirements.txt
 ```
-## Quick start
-1. Find out your ID and your friend's ID.
-You can do it like this:
-    - Open a chat with a friend and see the link. Remember numbers after `sel=`
-    - You can find your ID [here](https://vk.com/settings) by clicking on the 'Profile URL' button
-    - Or use [this VK app](https://vk.com/linkapp)
-2. Open `settings.py` and write your login, password and your ID
-3. Open `main.py`, write FRIEND_ID and uncomment the required code
+
+Отредактируйте файл `settings.py`, введя свои данные.
+
+Скрипт готов к работе, вы великолепны!
+
+## Как пользоваться скриптом
+
+Откройте файл `main.py` и назначьте переменной `friend_id` значение id пользователя, с которым нужно вытащить переписку.
+Самые удобные способы по получению id пользователя:
+
+- Откройте чат с пользователем. Скопируйте значение, идущее за `sel=`
+- Откройте профиль пользователя и скопируйте значение, идущее за https://vk.com/
+
+Запустите `main.py`. Если вы запускаете скрипт впервые и у вас установлена двухфакторная аутентификация — введите код в
+консоль. Начнётся сканирование сообщений и запись в базу.
+Чтобы сканировать сообщения всех пользователей, необходимо пройтись в цикле по списку id собеседников.
