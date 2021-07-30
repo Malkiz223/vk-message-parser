@@ -1,15 +1,24 @@
-import os
+import sys
 
 import psycopg2
-from psycopg2 import Error
+from psycopg2._psycopg import connection as connect_, cursor as cursor_  # нужны для автодополнения в IDE
 
-try:
-    connection = psycopg2.connect(user='postgres',
-                                  password=os.getenv('POSTGRESQL_PASSWORD'),
-                                  database='vk_messages',
-                                  host='127.0.0.1',
-                                  port=5432)
-    cursor = connection.cursor()
+
+def connect_to_postgres():
+    try:
+        from settings import postgres_user, postgres_password, postgres_database, postgres_host, postgres_port
+        connect: connect_ = psycopg2.connect(user=postgres_user, password=postgres_password,
+                                             database=postgres_database, host=postgres_host, port=postgres_port)
+        cursor: cursor_ = connect.cursor()  # аннотация типов у connection и cursor нужна для автодополнения в IDE
+        return connect, cursor
+    except ImportError:
+        return None
+    except psycopg2.OperationalError:
+        print(f'Не смогли подключиться к базе PostgreSQL с названием {postgres_database}')
+        sys.exit()
+
+
+def create_tables_if_not_exists(connect, cursor):
     cursor.execute('CREATE TABLE IF NOT EXISTS users ('
                    '    vk_id INT PRIMARY KEY,'
                    '    vk_url_nickname VARCHAR(50) UNIQUE NOT NULL,'
@@ -109,12 +118,8 @@ try:
                    '    is_one_time BOOLEAN,'
                    '    FOREIGN KEY (message_id) REFERENCES messages (message_id)'
                    ');')
-    connection.commit()
-    print('Таблицы созданы')
-except (Exception, Error) as error:
-    print('Ошибка при работе с PostgreSQL', error)
-finally:
-    if connection:
-        cursor.close()
-        connection.close()
-        print('Соединение с PostgreSQL закрыто')
+    connect.commit()
+
+
+connect, cursor = connect_to_postgres()
+create_tables_if_not_exists(connect, cursor)
