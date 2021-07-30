@@ -7,5 +7,5 @@ def main(friend_id):
 
 
 if __name__ == '__main__':
-    friend_id = 1  # int or str (1 or 'durov')
+    friend_id: int or str = 1  # 1 or 'durov'
     main(friend_id)
