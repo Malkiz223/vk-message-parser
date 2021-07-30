@@ -1,15 +1,10 @@
-import os
-import sys
 import time
 from datetime import datetime
 
-import psycopg2
-from psycopg2._psycopg import connection, cursor
 from requests.exceptions import ConnectionError
-from vk_messages import MessagesAPI
-from vk_messages.vk_messages import Exception_MessagesAPI
 
-import settings
+from database import db_connection as db, save_attachment_to_db
+from vk_api import vk_api
 
 
 class VkParser:
@@ -19,50 +14,37 @@ class VkParser:
     Может сканировать пользователей как по числовому, так и по буквенному ID.
     """
 
-    def __init__(self, friend_id: int or str, two_factor: bool = settings.TWO_FACTOR):
-        if not os.path.exists('sessions/'):
-            os.mkdir('sessions/')
-        try:
-            self.vk_api = MessagesAPI(login=settings.VK_LOGIN, password=settings.VK_PASSWORD,
-                                      two_factor=two_factor, cookies_save_path='sessions/')
-        except Exception_MessagesAPI as e:
-            print(f'Неверный пароль или {"имеется" if two_factor else "отсутствует"} двухфакторная аутентификация.', e)
-            print('Передайте верные аргументы в экземпляр класса VkParser')
-            sys.exit()
-        try:
-            self.connection: connection = psycopg2.connect(user='postgres', password=os.getenv('POSTGRESQL_PASSWORD'),
-                                                           database='vk_messages', host='127.0.0.1', port=5432)
-            self.cursor: cursor = self.connection.cursor()
-        except psycopg2.OperationalError:
-            print(f'Не смогли подключиться к базе PostgreSQL с названием vk_messages')
-            sys.exit()
+    def __init__(self, friend_id: int or str):
         self.messages = []
         self.SCAN_MESSAGES_PER_CALL = 200  # максимум, что позволяет API VK
         self.offset_scanned_messages = -200  # отрицательный offset в силу особенностей API VK
-        # реализовано для удобного вызова функций по типу вложения вместо if/elif
-        self.save_to_db_methods = {
-            'photo': self._save_photo_to_db,
-            'sticker': self._save_sticker_to_db,
-            'link': self._save_link_to_db,
-            'video': self._save_video_to_db,
-            'doc': self._save_doc_to_db,
-            'audio': self._save_audio_to_db,
-            'audio_message': self._save_audio_message_to_db,
-            'call': self._save_call_to_db,
-            'gift': self._save_gift_to_db,
-            'wall': self._save_wall_to_db,
-            'graffiti': self._save_graffiti_to_db,
-            'story': self._save_story_to_db,
-        }
 
-        self.my_id, self.my_url_nickname, self.my_first_name, self.my_last_name = self._get_user_data()
-        self.friend_id, self.friend_url_nickname, self.friend_first_name, self.friend_last_name = self._get_user_data(
-            friend_id)
+        self.my_user_data = self._get_user_data()
+        self.friend_user_data = self._get_user_data(friend_id)
+
+        self.my_id, self.my_url_nickname, self.my_first_name, self.my_last_name = self.my_user_data
+        self.friend_id, self.friend_url_nickname, self.friend_first_name, self.friend_last_name = self.friend_user_data
         self._save_users_to_db()
 
         self.total_messages, self.messages_scanned_before, self.last_scanned_id = self._get_chat_statistic()
-        self.messages_was_scanned = self.messages_scanned_before
-        self.count_messages_was_printed = self.messages_scanned_before
+        self.messages_was_scanned = self.messages_scanned_before  # количество ранее просканированных сообщений
+        self.count_messages_was_printed = self.messages_scanned_before  # для печати статистики в консоль
+
+        # реализовано для удобного вызова функций по типу вложения вместо if/elif
+        self.save_to_db_methods = {
+            'photo': save_attachment_to_db.save_photo_to_db,
+            'sticker': save_attachment_to_db.save_sticker_to_db,
+            'link': save_attachment_to_db.save_link_to_db,
+            'video': save_attachment_to_db.save_video_to_db,
+            'doc': save_attachment_to_db.save_doc_to_db,
+            'audio': save_attachment_to_db.save_audio_to_db,
+            'audio_message': save_attachment_to_db.save_audio_message_to_db,
+            'call': save_attachment_to_db.save_call_to_db,
+            'gift': save_attachment_to_db.save_gift_to_db,
+            'wall': save_attachment_to_db.save_wall_to_db,
+            'graffiti': save_attachment_to_db.save_graffiti_to_db,
+            'story': save_attachment_to_db.save_story_to_db,
+        }
 
     def get_messages_from_vk(self) -> None:
         """
@@ -72,16 +54,16 @@ class VkParser:
         из-за особенностей получения сообщений через API , т.к. start_message_id и rev (reverse) не работают вместе.
         """
         try:
-            json_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id,
-                                               count=self.SCAN_MESSAGES_PER_CALL,
-                                               offset=self.offset_scanned_messages,
-                                               start_message_id=self.last_scanned_id)
-            json_messages['items'] = json_messages['items'][::-1]
+            json_messages = vk_api.method('messages.getHistory', user_id=self.friend_id,
+                                          count=self.SCAN_MESSAGES_PER_CALL,
+                                          offset=self.offset_scanned_messages,
+                                          start_message_id=self.last_scanned_id)
+            json_messages['items'] = json_messages['items'][::-1]  # теперь сообщения идут в хронологическом порядке
             for message in json_messages['items']:
                 self.messages.append(message)
             self.offset_scanned_messages -= self.SCAN_MESSAGES_PER_CALL
         except (ConnectionError, AttributeError):  # скрипт всегда падает без этой обработки исключений
-            time.sleep(0.1)
+            time.sleep(0.2)
 
     def print_parsing_progress_to_console(self) -> None:
         """
@@ -94,7 +76,7 @@ class VkParser:
             print(f'Просканировано {self.messages_was_scanned} из {self.total_messages} сообщений')
             self.count_messages_was_printed = self.messages_was_scanned  # иначе дублирует печать
 
-    def save_messages_to_db(self) -> None:
+    def _save_messages_to_db(self) -> None:
         """
         Берёт сообщения из self.messages, просканированные ранее, и кладёт их в базу. Если в сообщении было вложение -
         кладёт вложение в таблицу этого типа вложений. Пропускает market в виду малого смысла его использования.
@@ -106,125 +88,45 @@ class VkParser:
             chat_id: int = message['peer_id']
             conversation_message_id: int = message.get('conversation_message_id')
             text: str = message['text']
-            self.cursor.execute(
+            db.cursor.execute(
                 'INSERT INTO messages (message_id, date_gmt, from_id, chat_id, conversation_message_id, text) '
                 'VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (message_id) DO NOTHING',
                 (message_id, date_gmt, from_id, chat_id, conversation_message_id, text,))
-            if self.cursor.statusmessage == 'INSERT 0 1':  # если значение вставлено успешно
+
+            if db.cursor.statusmessage == 'INSERT 0 1':  # если значение вставлено успешно
                 for attachment in message.get('attachments'):
                     attachment_type: str = attachment['type']
                     if attachment_type == 'market':  # можно класть и маркет в базу, но смысла мало
                         continue
                     try:
                         # в зависимости от типа вложения запускается нужный метод, см. __init__.self.save_to_db_methods
-                        self.save_to_db_methods[attachment_type](message['id'], attachment[attachment_type])
+                        self.save_to_db_methods[attachment_type](db.cursor, message['id'],
+                                                                 attachment[attachment_type])
                     except TypeError:  # если в будущих версиях VK появятся новые типы вложений
                         print(f'[ERR] Не вставили значение в базу, пропускаем: {attachment}')
-        self.connection.commit()
-
-    def _save_photo_to_db(self, message_id: int, attachment: dict) -> None:
-        photo_url: str = attachment['sizes'][-1]['url']
-        self.cursor.execute('INSERT INTO photos (message_id, image_url) VALUES (%s, %s)', (message_id, photo_url,))
-
-    def _save_sticker_to_db(self, message_id: int, attachment: dict) -> None:
-        product_id: int = attachment['product_id']
-        sticker_id: int = attachment['sticker_id']
-        image_url: str = f'https://vk.com/sticker/1-{sticker_id}-512'  # 512 ширина/высота стикера, есть 64/128/256/512
-        self.cursor.execute('INSERT INTO stickers (message_id, product_id, sticker_id, image_url) '
-                            'VALUES (%s, %s, %s, %s)', (message_id, product_id, sticker_id, image_url,))
-
-    def _save_link_to_db(self, message_id: int, attachment: dict) -> None:
-        title: str = attachment['title']
-        url: str = attachment['url']
-        self.cursor.execute('INSERT INTO links (message_id, title, url) VALUES (%s, %s, %s)', (message_id, title, url))
-
-    def _save_video_to_db(self, message_id: int, attachment: dict) -> None:
-        """
-        У видео нет ссылки, даже если оно ведёт на YouTube. Через API его достать нельзя.
-        """
-        description: str = attachment.get('description')
-        duration: int = attachment['duration']
-        image_url: str = attachment['image'][-1]['url']
-        self.cursor.execute('INSERT INTO videos (message_id, description, duration, image_url) VALUES (%s, %s, %s, %s)',
-                            (message_id, description, duration, image_url,))
-
-    def _save_doc_to_db(self, message_id: int, attachment: dict) -> None:
-        title: str = attachment['title']
-        extension: str = attachment['ext']
-        url: str = attachment['url']
-        self.cursor.execute('INSERT INTO docs (message_id, title, extension, url) VALUES (%s, %s, %s, %s)',
-                            (message_id, title, extension, url,))
-
-    def _save_audio_to_db(self, message_id: int, attachment: dict) -> None:
-        artist: str = attachment['artist']
-        title: str = attachment['title']
-        duration: int = attachment['duration']
-        url: str = attachment['url']  # url аудио позволяет скачать какую-то непонятную фигню формата .m3u8
-        self.cursor.execute('INSERT INTO audios (message_id, artist, title, duration, url) VALUES (%s, %s, %s, %s, %s)',
-                            (message_id, artist, title, duration, url,))
-
-    def _save_audio_message_to_db(self, message_id: int, attachment: dict) -> None:
-        duration: str = attachment['duration']
-        link_ogg: str = attachment['link_ogg']
-        link_mp3: str = attachment['link_mp3']
-        transcript: str = attachment.get('transcript')  # транскрипт отсутствует у старых сообщений, положится null
-        self.cursor.execute('INSERT INTO audio_messages (message_id, duration, link_ogg, link_mp3, transcript) VALUES ('
-                            '%s, %s, %s, %s, %s)', (message_id, duration, link_ogg, link_mp3, transcript,))
-
-    def _save_call_to_db(self, message_id: int, attachment: dict) -> None:
-        initiator_id: int = attachment['initiator_id']
-        state: str = attachment['state']
-        video: bool = attachment['video']
-        self.cursor.execute('INSERT INTO calls (message_id, initiator_id, state, video) VALUES (%s, %s, %s, %s)',
-                            (message_id, initiator_id, state, video,))
-
-    def _save_gift_to_db(self, message_id: int, attachment: dict) -> None:
-        gift_id: int = attachment['id']
-        image_url: str = attachment['thumb_256']
-        stickers_product_id: int = attachment.get('stickers_product_id')
-        self.cursor.execute('INSERT INTO gifts (message_id, gift_id, image_url, stickers_product_id) VALUES ('
-                            '%s, %s, %s, %s)', (message_id, gift_id, image_url, stickers_product_id,))
-
-    def _save_wall_to_db(self, message_id: int, attachment: dict) -> None:
-        from_id: int = attachment['from_id']
-        post_date_gmt: datetime = datetime.fromtimestamp(attachment['date'])
-        post_type: str = attachment['post_type']
-        text: str = attachment['text']
-        self.cursor.execute('INSERT INTO walls (message_id, from_id, post_date_gmt, post_type, text) VALUES ('
-                            '%s, %s, %s, %s, %s)', (message_id, from_id, post_date_gmt, post_type, text,))
-
-    def _save_graffiti_to_db(self, message_id: int, attachment: dict) -> None:
-        image_url: str = attachment['url']
-        self.cursor.execute('INSERT INTO graffiti (message_id, image_url) VALUES (%s, %s)', (message_id, image_url,))
-
-    def _save_story_to_db(self, message_id: int, attachment: dict) -> None:
-        can_see: int = attachment['can_see']
-        story_date_gmt: datetime = datetime.fromtimestamp(attachment['date'])
-        expires_at_gmt: datetime = datetime.fromtimestamp(attachment['expires_at'])
-        is_one_time: bool = attachment['is_one_time']  # на моей практике здесь всегда лежит False
-        self.cursor.execute('INSERT INTO stories (message_id, can_see, story_date_gmt, expires_at_gmt, is_one_time) '
-                            'VALUES (%s, %s, %s, %s, %s)',
-                            (message_id, can_see, story_date_gmt, expires_at_gmt, is_one_time,))
+        db.connect.commit()
 
     def _save_users_to_db(self) -> None:
         """
         Можно класть имена в разных падежах, их можно вытянуть через API VK.
         """
-        sql_insert_into_users = ('INSERT INTO users (vk_id, vk_url_nickname, vk_first_name, vk_last_name) '
-                                 'VALUES (%s, %s, %s, %s) ON CONFLICT (vk_url_nickname) DO NOTHING')
-        users = [(self.my_id, self.my_url_nickname, self.my_first_name, self.my_last_name),
-                 (self.friend_id, self.friend_url_nickname, self.friend_first_name, self.friend_last_name)]
-        self.cursor.executemany(sql_insert_into_users, users)
-        self.connection.commit()
+        users = [self.my_user_data, self.friend_user_data]
+        # users = ', '.join([self.sql_field_char] * len(users))
+        sql_insert_into_users = 'INSERT INTO users (vk_id, vk_url_nickname, vk_first_name, vk_last_name) ' \
+                                'VALUES (%s, %s, %s, %s) ON CONFLICT (vk_url_nickname) DO NOTHING'
 
-    def _get_user_data(self, input_id: int or str = ''):
+        db.cursor.executemany(sql_insert_into_users, users)
+        db.connect.commit()
+
+    @staticmethod
+    def _get_user_data(input_id: int or str = ''):
         """
         В случае input_id="" (не None) достаются данные своего аккаунта. fields='screen_name' - псевдоним страницы,
         идущий после https://vk.com/. Замена id12345 либо сама строка id12345 при отсутствии псевдонима.
         """
         while True:
             try:
-                user_data = self.vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
+                user_data = vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
                 user_id = user_data['id']
                 user_url_nickname = user_data['screen_name']
                 user_first_name = user_data['first_name']
@@ -241,14 +143,14 @@ class VkParser:
         """
         while True:
             try:
-                total_messages = self.vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
+                total_messages = vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
                 break
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
-        self.cursor.execute('SELECT COUNT(*) FROM messages WHERE chat_id = %s', (self.friend_id,))
-        messages_scanned_before = self.cursor.fetchone()[0]
-        self.cursor.execute('SELECT MAX(message_id) FROM messages WHERE chat_id = %s', (self.friend_id,))
-        last_scanned_id = self.cursor.fetchone()[0]
+        db.cursor.execute('SELECT COUNT(*) FROM messages WHERE chat_id = %s', (self.friend_id,))
+        messages_scanned_before = db.cursor.fetchone()[0]
+        db.cursor.execute('SELECT MAX(message_id) FROM messages WHERE chat_id = %s', (self.friend_id,))
+        last_scanned_id = db.cursor.fetchone()[0]
         last_scanned_id = 1 if last_scanned_id is None else last_scanned_id
         return total_messages, messages_scanned_before, last_scanned_id
 
@@ -258,22 +160,16 @@ class VkParser:
         """
         while self.messages_was_scanned < self.total_messages:
             self.get_messages_from_vk()
-            self.save_messages_to_db()
+            self._save_messages_to_db()
             self.print_parsing_progress_to_console()
-            del self.messages[:]  #
+            del self.messages[:]  # чистит оперативку, влияет на вывод статистики и отправку сообщений в базу
         else:
             print(f'Сообщения с пользователем {self.friend_first_name} {self.friend_last_name} просканированы')
 
     def __del__(self) -> None:
         try:
-            if self.connection:
-                self.cursor.close()
-                self.connection.close()
+            if db.connect:
+                db.cursor.close()
+                db.connect.close()
         except AttributeError:
             pass
-
-
-if __name__ == '__main__':
-    friend_id = 1  # int or str (1 or 'durov')
-    parser = VkParser(friend_id=friend_id, two_factor=True)
-    parser.run()
