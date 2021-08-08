@@ -26,8 +26,9 @@ class VkParser:
         self.friend_id, self.friend_url_nickname, self.friend_first_name, self.friend_last_name = self.friend_user_data
         self._save_users_to_db()
 
-        self.total_messages, self.messages_scanned_before, self.last_scanned_id = self._get_chat_statistic()
-        self.messages_was_scanned = self.messages_scanned_before  # количество ранее просканированных сообщений
+        self.total_messages = self._get_number_of_messages()
+        self.messages_scanned_before, self.last_scanned_id = self._get_saved_messages_statistics()
+        self.messages_was_scanned = self.messages_scanned_before  # количество ранее сканированных сообщений
         self.count_messages_was_printed = self.messages_scanned_before  # для печати статистики в консоль
 
         # реализовано для удобного вызова функций по типу вложения вместо if/elif
@@ -135,22 +136,28 @@ class VkParser:
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
 
-    def _get_chat_statistic(self):
+    def _get_number_of_messages(self) -> int:
         """
         total_messages - количество всех сообщений с пользователем.
         """
         while True:
             try:
-                total_messages = vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
-                break
+                total_messages: int = vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
+                return total_messages
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
+
+    def _get_saved_messages_statistics(self) -> tuple[int, int]:
+        """
+        messages_scanned_before - количество сообщений, уже сохранённых в базе (чтобы не сканировать сначала).
+        last_scanned_id - последний ID сообщения в базе (меняется на 1 при отсутствии сообщений в базе).
+        """
         db.cursor.execute('SELECT COUNT(*) FROM messages WHERE chat_id = %s', (self.friend_id,))
         messages_scanned_before = db.cursor.fetchone()[0]
         db.cursor.execute('SELECT MAX(message_id) FROM messages WHERE chat_id = %s', (self.friend_id,))
         last_scanned_id = db.cursor.fetchone()[0]
         last_scanned_id = 1 if last_scanned_id is None else last_scanned_id
-        return total_messages, messages_scanned_before, last_scanned_id
+        return messages_scanned_before, last_scanned_id
 
     def run(self) -> None:
         """
