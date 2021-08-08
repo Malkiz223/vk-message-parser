@@ -1,15 +1,15 @@
 import sys
 
 import psycopg2
-from psycopg2._psycopg import connection as connect_, cursor as cursor_  # нужны для автодополнения в IDE
+from psycopg2._psycopg import connection as _connect, cursor as _cursor  # нужны для автодополнения в IDE
 
 
 def connect_to_postgres():
     try:
-        from settings import postgres_user, postgres_password, postgres_database, postgres_host, postgres_port
-        connect: connect_ = psycopg2.connect(user=postgres_user, password=postgres_password,
-                                             database=postgres_database, host=postgres_host, port=postgres_port)
-        cursor: cursor_ = connect.cursor()  # аннотация типов у connection и cursor нужна для автодополнения в IDE
+        from settings import postgres_user, postgres_password, postgres_dbname, postgres_host, postgres_port
+        connect: _connect = psycopg2.connect(user=postgres_user, password=postgres_password,
+                                             dbname=postgres_dbname, host=postgres_host, port=postgres_port)
+        cursor: _cursor = connect.cursor()  # аннотация типов у connection и cursor нужна для автодополнения в IDE
         return connect, cursor
     except ImportError:
         return None
