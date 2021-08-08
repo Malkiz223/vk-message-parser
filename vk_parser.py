@@ -120,18 +120,18 @@ class VkParser:
         db.connect.commit()
 
     @staticmethod
-    def _get_user_data(input_id: int or str = ''):
+    def _get_user_data(input_id: int or str = '') -> tuple[int, str, str, str]:
         """
         В случае input_id="" (не None) достаются данные своего аккаунта.
         fields='screen_name' - псевдоним страницы, идущий после https://vk.com/.
         """
         while True:
             try:
-                user_data = vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
-                user_id = user_data['id']
-                user_url_nickname = user_data['screen_name']
-                user_first_name = user_data['first_name']
-                user_last_name = user_data['last_name']
+                user_data: dict = vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
+                user_id: int = user_data['id']
+                user_url_nickname: str = user_data['screen_name']
+                user_first_name: str = user_data['first_name']
+                user_last_name: str = user_data['last_name']
                 return user_id, user_url_nickname, user_first_name, user_last_name
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
@@ -153,9 +153,9 @@ class VkParser:
         last_scanned_id - последний ID сообщения в базе (меняется на 1 при отсутствии сообщений в базе).
         """
         db.cursor.execute('SELECT COUNT(*) FROM messages WHERE chat_id = %s', (self.friend_id,))
-        messages_scanned_before = db.cursor.fetchone()[0]
+        messages_scanned_before: int = db.cursor.fetchone()[0]
         db.cursor.execute('SELECT MAX(message_id) FROM messages WHERE chat_id = %s', (self.friend_id,))
-        last_scanned_id = db.cursor.fetchone()[0]
+        last_scanned_id: int = db.cursor.fetchone()[0]
         last_scanned_id = 1 if last_scanned_id is None else last_scanned_id
         return messages_scanned_before, last_scanned_id
 
