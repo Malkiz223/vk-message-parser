@@ -12,10 +12,9 @@ def connect_to_postgres():
         cursor: _cursor = connect.cursor()  # аннотация типов у connection и cursor нужна для автодополнения в IDE
         return connect, cursor
     except ImportError:
-        return None
+        sys.exit('Ошибка импорта настроек PostgreSQL из файла settings.py')
     except psycopg2.OperationalError:
-        print(f'Не смогли подключиться к базе PostgreSQL с названием {postgres_database}')
-        sys.exit()
+        sys.exit(f'Не смогли подключиться к базе PostgreSQL с названием {postgres_dbname}')
 
 
 def create_tables_if_not_exists(connect, cursor):
