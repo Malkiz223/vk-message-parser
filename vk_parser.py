@@ -52,19 +52,21 @@ class VkParser:
         Обращается к API VK и вытягивает 200 сообщений. Если сообщений с этим пользователем не было в базе (проверяется
         в self.last_scanned_id), то парсит с самого начала. Если сообщения были - начинает парсить с N + 1.
         Если ошибок не было - offset смещается, позволяя получить следующие 200 сообщений. self.offset отрицательный
-        из-за особенностей получения сообщений через API , т.к. start_message_id и rev (reverse) не работают вместе.
+        из-за особенностей получения сообщений через API, т.к. start_message_id и rev (reverse) не работают вместе.
         """
-        try:
-            json_messages = vk_api.method('messages.getHistory', user_id=self.friend_id,
-                                          count=self.SCAN_MESSAGES_PER_CALL,
-                                          offset=self.offset_scanned_messages,
-                                          start_message_id=self.last_scanned_id)
-            json_messages['items'] = json_messages['items'][::-1]  # теперь сообщения идут в хронологическом порядке
-            for message in json_messages['items']:
-                self.messages.append(message)
-            self.offset_scanned_messages -= self.SCAN_MESSAGES_PER_CALL
-        except (ConnectionError, AttributeError):  # скрипт всегда падает без этой обработки исключений
-            time.sleep(0.2)
+        while True:  # иногда VK API банит запрос и приходится спрашивать заново
+            try:
+                json_messages = vk_api.method('messages.getHistory', user_id=self.friend_id,
+                                              count=self.SCAN_MESSAGES_PER_CALL,
+                                              offset=self.offset_scanned_messages,
+                                              start_message_id=self.last_scanned_id)
+                json_messages['items'] = json_messages['items'][::-1]  # теперь сообщения идут в хронологическом порядке
+                for message in json_messages['items']:
+                    self.messages.append(message)
+                self.offset_scanned_messages -= self.SCAN_MESSAGES_PER_CALL
+                break
+            except (ConnectionError, AttributeError):  # скрипт всегда падает без этой обработки исключений
+                time.sleep(0.2)
 
     def print_parsing_progress_to_console(self) -> None:
         """
