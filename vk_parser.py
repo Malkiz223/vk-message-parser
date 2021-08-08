@@ -101,8 +101,7 @@ class VkParser:
                         continue
                     try:
                         # в зависимости от типа вложения запускается нужный метод, см. __init__.self.save_to_db_methods
-                        self.save_to_db_methods[attachment_type](db.cursor, message['id'],
-                                                                 attachment[attachment_type])
+                        self.save_to_db_methods[attachment_type](db.cursor, message_id, attachment[attachment_type])
                     except TypeError:  # если в будущих версиях VK появятся новые типы вложений
                         print(f'[ERR] Не вставили значение в базу, пропускаем: {attachment}')
         db.connect.commit()
@@ -112,10 +111,8 @@ class VkParser:
         Можно сохранять имена пользователей в разных падежах, их можно вытянуть через API VK.
         """
         users = [self.my_user_data, self.friend_user_data]
-        # users = ', '.join([self.sql_field_char] * len(users))
         sql_insert_into_users = 'INSERT INTO users (vk_id, vk_url_nickname, vk_first_name, vk_last_name) ' \
                                 'VALUES (%s, %s, %s, %s) ON CONFLICT (vk_url_nickname) DO NOTHING'
-
         db.cursor.executemany(sql_insert_into_users, users)
         db.connect.commit()
 
