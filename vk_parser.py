@@ -10,7 +10,7 @@ from vk_api import vk_api
 class VkParser:
     """
     Сканирует сообщения с указанным пользователем и сохраняет их в заранее созданную PostgreSQL базу.
-    Скрипт создания таблиц лежит в database/create_db.py.
+    Таблицы создаются автоматически в database/db_connection.py
     Может сканировать пользователей как по числовому, так и по буквенному ID.
     """
 
@@ -67,7 +67,7 @@ class VkParser:
 
     def print_parsing_progress_to_console(self) -> None:
         """
-        Печатает в консоль прогресс сканирования сообщений. При дублировании значения пропускает печать.
+        Печатает в консоль прогресс сканирования сообщений.
         """
         self.messages_was_scanned += len(self.messages)
         if self.messages_was_scanned > self.total_messages:  # чтобы не превышало верхний предел сообщений
@@ -78,7 +78,7 @@ class VkParser:
 
     def _save_messages_to_db(self) -> None:
         """
-        Берёт сообщения из self.messages, просканированные ранее, и кладёт их в базу. Если в сообщении было вложение -
+        Берёт сообщения из self.messages, сканированные ранее, и кладёт их в базу. Если в сообщении было вложение -
         кладёт вложение в таблицу этого типа вложений. Пропускает market в виду малого смысла его использования.
         """
         for message in self.messages:
@@ -108,7 +108,7 @@ class VkParser:
 
     def _save_users_to_db(self) -> None:
         """
-        Можно класть имена в разных падежах, их можно вытянуть через API VK.
+        Можно сохранять имена пользователей в разных падежах, их можно вытянуть через API VK.
         """
         users = [self.my_user_data, self.friend_user_data]
         # users = ', '.join([self.sql_field_char] * len(users))
@@ -121,8 +121,8 @@ class VkParser:
     @staticmethod
     def _get_user_data(input_id: int or str = ''):
         """
-        В случае input_id="" (не None) достаются данные своего аккаунта. fields='screen_name' - псевдоним страницы,
-        идущий после https://vk.com/. Замена id12345 либо сама строка id12345 при отсутствии псевдонима.
+        В случае input_id="" (не None) достаются данные своего аккаунта.
+        fields='screen_name' - псевдоним страницы, идущий после https://vk.com/.
         """
         while True:
             try:
@@ -137,9 +137,7 @@ class VkParser:
 
     def _get_chat_statistic(self):
         """
-        total_messages - всего сообщений с пользователем
-        messages_scanned_before - количество сообщений, просканированных ранее (чтобы не начинать сначала).
-        last_scanned_id - последний айдишник сообщения в базе (меняется на 1 при отсутствии сообщений в базе).
+        total_messages - количество всех сообщений с пользователем.
         """
         while True:
             try:
@@ -164,7 +162,7 @@ class VkParser:
             self.print_parsing_progress_to_console()
             del self.messages[:]  # чистит оперативку, влияет на вывод статистики и отправку сообщений в базу
         else:
-            print(f'Сообщения с пользователем {self.friend_first_name} {self.friend_last_name} просканированы')
+            print(f'Сообщения с пользователем {self.friend_first_name} {self.friend_last_name} сохранены в базе')
 
     def __del__(self) -> None:
         try:
