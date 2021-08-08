@@ -73,11 +73,9 @@ class VkParser:
         Печатает в консоль прогресс сканирования сообщений.
         """
         self.messages_was_scanned += len(self.messages)
-        if self.messages_was_scanned > self.total_messages:  # чтобы не превышало верхний предел сообщений
+        if self.messages_was_scanned > self.total_messages:  # чтобы не превышало общее количество сообщений
             self.messages_was_scanned = self.total_messages
-        if self.count_messages_was_printed < self.messages_was_scanned:  # если уже печатало данное количество - скипаем
-            print(f'Просканировано {self.messages_was_scanned} из {self.total_messages} сообщений')
-            self.count_messages_was_printed = self.messages_was_scanned  # иначе дублирует печать
+        print(f'{self.messages_was_scanned} из {self.total_messages} сообщений сохранены в базе')
 
     def _save_messages_to_db(self) -> None:
         """
