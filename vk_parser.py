@@ -126,7 +126,7 @@ class VkParser:
             try:
                 user_data: dict = vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
                 user_id: int = user_data['id']
-                user_url_nickname: str = user_data['screen_name']
+                user_url_nickname: str = user_data.get('screen_name')
                 user_first_name: str = user_data['first_name']
                 user_last_name: str = user_data['last_name']
                 return user_id, user_url_nickname, user_first_name, user_last_name
