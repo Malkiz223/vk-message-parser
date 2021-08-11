@@ -24,6 +24,7 @@ class VkParser:
 
         self.my_id, self.my_url_nickname, self.my_first_name, self.my_last_name = self.my_user_data
         self.friend_id, self.friend_url_nickname, self.friend_first_name, self.friend_last_name = self.friend_user_data
+        self.friend_full_name = self.friend_first_name + ' ' + self.friend_last_name
         self._save_users_to_db()
 
         self.total_messages = self._get_number_of_messages()
@@ -160,18 +161,13 @@ class VkParser:
         """
         Основная функция, запускает парсинг сообщений, сохраняет сообщения в базу, печатая прогресс сканирования.
         """
+        print(f'Начинаем сканировать сообщения с пользователем {self.friend_full_name}')
         while self.messages_was_scanned < self.total_messages:
             self.get_messages_from_vk()
             self._save_messages_to_db()
             self.print_parsing_progress_to_console()
             del self.messages[:]  # чистит оперативку, влияет на вывод статистики и отправку сообщений в базу
+        if self.total_messages > 0:
+            print(f'Сообщения с пользователем {self.friend_full_name} сохранены в базе')
         else:
-            print(f'Сообщения с пользователем {self.friend_first_name} {self.friend_last_name} сохранены в базе')
-
-    def __del__(self) -> None:
-        try:
-            if db.connect:
-                db.cursor.close()
-                db.connect.close()
-        except AttributeError:
-            pass
+            print(f'Сообщения с пользователем {self.friend_full_name} не найдены')
