@@ -88,11 +88,11 @@ class VkParser:
             from_id: int = message['from_id']
             chat_id: int = message['peer_id']
             conversation_message_id: int = message.get('conversation_message_id')
-            text: str = message['text']
+            message_text: str = message['text']
             db.cursor.execute(
-                'INSERT INTO messages (message_id, date_gmt, from_id, chat_id, conversation_message_id, text) '
+                'INSERT INTO messages (message_id, date_gmt, from_id, chat_id, conversation_message_id, message_text) '
                 'VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (message_id) DO NOTHING',
-                (message_id, date_gmt, from_id, chat_id, conversation_message_id, text,))
+                (message_id, date_gmt, from_id, chat_id, conversation_message_id, message_text,))
 
             if db.cursor.statusmessage == 'INSERT 0 1':  # если значение вставлено успешно, защита от дубликатов
                 for attachment in message.get('attachments'):
