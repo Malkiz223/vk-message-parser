@@ -2,7 +2,6 @@ import os
 
 VK_LOGIN: str = os.getenv('VK_LOGIN')  # 'admin@gmail.com'
 VK_PASSWORD: str = os.getenv('VK_PASSWORD')  # 'qwerty123'
-TWO_FACTOR: bool = True  # False, если у вас отсутствует двухфакторная аутентификация
 
 # Настройки PostgreSQL
 postgres_user: str = 'postgres'  # пользователь по умолчанию
