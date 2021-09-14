@@ -32,6 +32,8 @@ class VkParser:
         self.messages_was_scanned = self.messages_scanned_before  # количество ранее сканированных сообщений
         self.count_messages_was_printed = self.messages_scanned_before  # для печати статистики в консоль
 
+        # в этих типах вложений мало полезной информации, полагаю, она не потребуется для анализа сообщений
+        self.unnecessary_attachment_type = {'market', 'audio_playlist', 'money_transfer', 'mini_app', 'wall_reply'}
         # реализовано для удобного вызова функций по типу вложения вместо if/elif
         self.save_to_db_methods = {
             'photo': save_attachment_to_db.save_photo_to_db,
@@ -98,12 +100,13 @@ class VkParser:
             if db.cursor.statusmessage == 'INSERT 0 1':  # если значение вставлено успешно, защита от дубликатов
                 for attachment in message.get('attachments'):
                     attachment_type: str = attachment['type']
-                    if attachment_type == 'market':  # можно класть и маркет в базу, но смысла мало
+
+                    if attachment_type in self.unnecessary_attachment_type:  # можем класть в базу, но тут мало инфы
                         continue
                     try:
                         # в зависимости от типа вложения запускается нужный метод, см. __init__.self.save_to_db_methods
                         self.save_to_db_methods[attachment_type](db.cursor, message_id, attachment[attachment_type])
-                    except TypeError:  # если в будущих версиях VK появятся новые типы вложений
+                    except (TypeError, KeyError):  # если в будущих версиях VK появятся новые типы вложений
                         print(f'[ERR] Не вставили значение в базу, пропускаем: {attachment}')
         db.connect.commit()
 
