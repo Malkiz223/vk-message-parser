@@ -4,7 +4,7 @@ from datetime import datetime
 from requests.exceptions import ConnectionError
 
 from database import db_connection as db, save_attachment_to_db
-from vk_api import vk_api
+from vk_session import vk_session
 
 
 class VkParser:
@@ -32,6 +32,8 @@ class VkParser:
         self.messages_was_scanned = self.messages_scanned_before  # количество ранее сканированных сообщений
         self.count_messages_was_printed = self.messages_scanned_before  # для печати статистики в консоль
 
+        # в этих типах вложений мало полезной информации, полагаю, она не потребуется для анализа сообщений
+        self.unnecessary_attachment_type = {'market', 'audio_playlist', 'money_transfer', 'mini_app', 'wall_reply'}
         # реализовано для удобного вызова функций по типу вложения вместо if/elif
         self.save_to_db_methods = {
             'photo': save_attachment_to_db.save_photo_to_db,
@@ -57,10 +59,10 @@ class VkParser:
         """
         while True:  # иногда VK API банит запрос и приходится спрашивать заново
             try:
-                json_messages = vk_api.method('messages.getHistory', user_id=self.friend_id,
-                                              count=self.SCAN_MESSAGES_PER_CALL,
-                                              offset=self.offset_scanned_messages,
-                                              start_message_id=self.last_scanned_id)
+                json_messages = vk_session.method('messages.getHistory', values={'user_id': self.friend_id,
+                                                                                 'count': self.SCAN_MESSAGES_PER_CALL,
+                                                                                 'offset': self.offset_scanned_messages,
+                                                                                 'start_message_id': self.last_scanned_id})
                 json_messages['items'] = json_messages['items'][::-1]  # теперь сообщения идут в хронологическом порядке
                 for message in json_messages['items']:
                     self.messages.append(message)
@@ -98,12 +100,13 @@ class VkParser:
             if db.cursor.statusmessage == 'INSERT 0 1':  # если значение вставлено успешно, защита от дубликатов
                 for attachment in message.get('attachments'):
                     attachment_type: str = attachment['type']
-                    if attachment_type == 'market':  # можно класть и маркет в базу, но смысла мало
+
+                    if attachment_type in self.unnecessary_attachment_type:  # можем класть в базу, но тут мало инфы
                         continue
                     try:
                         # в зависимости от типа вложения запускается нужный метод, см. __init__.self.save_to_db_methods
                         self.save_to_db_methods[attachment_type](db.cursor, message_id, attachment[attachment_type])
-                    except TypeError:  # если в будущих версиях VK появятся новые типы вложений
+                    except (TypeError, KeyError):  # если в будущих версиях VK появятся новые типы вложений
                         print(f'[ERR] Не вставили значение в базу, пропускаем: {attachment}')
         db.connect.commit()
 
@@ -118,14 +121,15 @@ class VkParser:
         db.connect.commit()
 
     @staticmethod
-    def _get_user_data(input_id: int or str = '') -> tuple[int, str, str, str]:
+    def _get_user_data(input_id: int or str = None) -> tuple[int, str, str, str]:
         """
         В случае input_id="" (не None) достаются данные своего аккаунта.
         fields='screen_name' - псевдоним страницы, идущий после https://vk.com/.
         """
         while True:
             try:
-                user_data: dict = vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
+                values = {"user_ids": input_id, "fields": "screen_name"}
+                user_data: dict = vk_session.method('users.get', values=values)[0]
                 user_id: int = user_data['id']
                 user_url_nickname: str = user_data.get('screen_name')
                 user_first_name: str = user_data['first_name']
@@ -140,7 +144,9 @@ class VkParser:
         """
         while True:
             try:
-                total_messages: int = vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
+                total_messages: int = vk_session.method('messages.getHistory', values={'user_id': self.friend_id})[
+                    'count']
+                # total_messages: int = vk_session.method('messages.getHistory')['count']
                 return total_messages
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
