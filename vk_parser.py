@@ -4,7 +4,7 @@ from datetime import datetime
 from requests.exceptions import ConnectionError
 
 from database import db_connection as db, save_attachment_to_db
-from vk_api import vk_api
+from vk_session import vk_session
 
 
 class VkParser:
@@ -57,10 +57,10 @@ class VkParser:
         """
         while True:  # иногда VK API банит запрос и приходится спрашивать заново
             try:
-                json_messages = vk_api.method('messages.getHistory', user_id=self.friend_id,
-                                              count=self.SCAN_MESSAGES_PER_CALL,
-                                              offset=self.offset_scanned_messages,
-                                              start_message_id=self.last_scanned_id)
+                json_messages = vk_session.method('messages.getHistory', values={'user_id': self.friend_id,
+                                                                                 'count': self.SCAN_MESSAGES_PER_CALL,
+                                                                                 'offset': self.offset_scanned_messages,
+                                                                                 'start_message_id': self.last_scanned_id})
                 json_messages['items'] = json_messages['items'][::-1]  # теперь сообщения идут в хронологическом порядке
                 for message in json_messages['items']:
                     self.messages.append(message)
@@ -118,14 +118,15 @@ class VkParser:
         db.connect.commit()
 
     @staticmethod
-    def _get_user_data(input_id: int or str = '') -> tuple[int, str, str, str]:
+    def _get_user_data(input_id: int or str = None) -> tuple[int, str, str, str]:
         """
         В случае input_id="" (не None) достаются данные своего аккаунта.
         fields='screen_name' - псевдоним страницы, идущий после https://vk.com/.
         """
         while True:
             try:
-                user_data: dict = vk_api.method('users.get', user_ids=input_id, fields='screen_name')[0]
+                values = {"user_ids": input_id, "fields": "screen_name"}
+                user_data: dict = vk_session.method('users.get', values=values)[0]
                 user_id: int = user_data['id']
                 user_url_nickname: str = user_data.get('screen_name')
                 user_first_name: str = user_data['first_name']
@@ -140,7 +141,9 @@ class VkParser:
         """
         while True:
             try:
-                total_messages: int = vk_api.method('messages.getHistory', user_id=self.friend_id)['count']
+                total_messages: int = vk_session.method('messages.getHistory', values={'user_id': self.friend_id})[
+                    'count']
+                # total_messages: int = vk_session.method('messages.getHistory')['count']
                 return total_messages
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
