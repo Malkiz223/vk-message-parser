@@ -36,7 +36,7 @@ def get_vk_session_by_password() -> vk_api.VkApi:
         auth_handler=two_factor_auth_handler,  # функция для обработки двухфакторной аутентификации
         config_filename=f'{sessions_folder_name}/session_{VK_LOGIN}.json',
         app_id=6121396,  # 6121396 - ID VK Admin. 2685278 - ID Kate Mobile
-        api_version='5.131'
+        api_version='5.131'  # лучше не менять, читай docstring
     )
     try:
         vk_session.auth()
@@ -46,10 +46,17 @@ def get_vk_session_by_password() -> vk_api.VkApi:
 
 
 def get_vk_session_by_token() -> vk_api.VkApi:
+    """
+    Берём токен, полученный из settings.py.
+    app_id требуется для работы API. Лишь некоторым "приложениям" разрешены многие методы API. VK Admin - одно из них.
+    Смена версии API может привести к изменениям получаемых данных, что приведёт к проблемам.
+
+    Ключевое отличие от get_vk_session_by_password заключается в том, что здесь нельзя вызывать vk_session.auth().
+    """
     vk_session = vk_api.VkApi(
         token=VK_ACCESS_TOKEN,
         app_id=6121396,  # 6121396 - ID VK Admin. 2685278 - ID Kate Mobile
-        api_version='5.131'
+        api_version='5.131'  # лучше не менять, читай docstring
     )
     return vk_session
 
@@ -59,4 +66,4 @@ if VK_ACCESS_TOKEN:
 elif VK_LOGIN and VK_PASSWORD:
     vk_session = get_vk_session_by_password()
 else:
-    sys.exit('Не смогли получить сессию ни через логин с паролем, ни через токен')
+    sys.exit('Не смогли получить сессию, т.к. нет ни логина с паролем, ни токена')
