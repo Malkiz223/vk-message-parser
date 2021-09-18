@@ -18,10 +18,10 @@
 
 ## Установка и настройка
 
-Скачайте и установите [PostgreSQL](https://www.postgresql.org/download/) (тестировалось на версии 13.3)
-и [Python 3.8+](https://www.python.org/downloads/)
+Скачайте и установите [PostgreSQL](https://www.postgresql.org/download/) (тестировалось на версии 13)
+и [Python 3.6+](https://www.python.org/downloads/)
 
-Подключитесь к PostgreSQL и создайте базу с удобным названием. По умолчанию это vk_messages.
+Подключитесь к PostgreSQL и создайте базу с удобным названием. По умолчанию используется vk_messages.
 
 В терминале вашей IDE введите следующие команды, чтобы клонировать репозиторий и установить зависимости:
 
@@ -34,7 +34,7 @@ pip install -r requirements.txt
 ```
 
 Отредактируйте файл `settings.py`, введя свои данные. Можно ввести
-либо `access token` [[получить](https://vkhost.github.io/)], либо логин с паролем. 
+либо `access token` [[получить](https://vkhost.github.io/)], либо логин с паролем.
 
 Скрипт готов к работе, вы великолепны!
 
