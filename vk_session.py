@@ -3,18 +3,19 @@ import sys
 
 import vk_api
 
-from settings import VK_LOGIN, VK_PASSWORD, VK_ACCESS_TOKEN
+from settings import VK_LOGIN, VK_PASSWORD, VK_ACCESS_TOKEN, SAVE_SESSION
 
 sessions_folder_name = 'sessions'
 
 
 def two_factor_auth_handler():
     """
-    При двухфакторной аутентификации вызывается эта функция. Требуется ввести код для входа. Обычно его отправляет
-    личным сообщением Администрация ВКонтакте, либо ввести код из Google Authenticator, если он подключен.
+    При двухфакторной аутентификации и входе через логин с паролем вызывается эта функция.
+    Требуется ввести код для входа. Обычно его отправляет личным сообщением Администрация ВКонтакте,
+    либо можно ввести код из Google Authenticator, если он подключен.
     """
-    key = input("Enter authentication code: ")  # Код двухфакторной аутентификации
-    remember_device = True  # Сохранять сессию в файл?
+    key = input("Введите код аутентификации: ")  # код двухфакторной аутентификации
+    remember_device = SAVE_SESSION  # сохранять сессию в файл?
     if remember_device:
         if not os.path.exists(sessions_folder_name):
             os.mkdir(sessions_folder_name)
