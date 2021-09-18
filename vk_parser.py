@@ -146,7 +146,6 @@ class VkParser:
             try:
                 total_messages: int = vk_session.method('messages.getHistory', values={'user_id': self.friend_id})[
                     'count']
-                # total_messages: int = vk_session.method('messages.getHistory')['count']
                 return total_messages
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
