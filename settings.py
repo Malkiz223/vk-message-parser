@@ -1,11 +1,15 @@
 import os
 import sys
 
-# авторизация происходит либо по паролю, либо по токену
+# Авторизация происходит либо по паролю, либо по access token
+# Не обязателен, если будет введён логин и пароль. Токен можно получить здесь: https://vkhost.github.io/
+VK_ACCESS_TOKEN: str = os.getenv('VK_ACCESS_TOKEN')  # '4e224ec586965787f254c01873933312d941e919b1c399f33168208a96ac9c0'
+
+# Логин с паролем не требуются, если введён access token. Он имеет высший приоритет в работе программы
 VK_LOGIN: str = os.getenv('VK_LOGIN')  # 'admin@gmail.com'
 VK_PASSWORD: str = os.getenv('VK_PASSWORD')  # 'qwerty123'
-# опционально, если получили логин и пароль
-VK_ACCESS_TOKEN: str = os.getenv('VK_ACCESS_TOKEN')  # токен можно получить здесь: https://vkhost.github.io/
+# Сохранять ли сессию в файл, чтобы при повторном запуске не стучаться на сервер аутентификации
+SAVE_SESSION: bool = True  # True / False
 
 if not (all([VK_LOGIN, VK_PASSWORD])) and not VK_ACCESS_TOKEN:
     sys.exit('Не получили связку логин+пароль и нет токена')
