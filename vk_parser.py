@@ -2,6 +2,7 @@ import time
 from datetime import datetime
 
 from requests.exceptions import ConnectionError
+from typing import Tuple
 
 from database import db_connection as db, save_attachment_to_db
 from vk_session import vk_session
@@ -121,7 +122,7 @@ class VkParser:
         db.connect.commit()
 
     @staticmethod
-    def _get_user_data(input_id: int or str = None) -> tuple[int, str, str, str]:
+    def _get_user_data(input_id: int or str = None) -> Tuple[int, str, str, str]:
         """
         В случае input_id="" (не None) достаются данные своего аккаунта.
         fields='screen_name' - псевдоним страницы, идущий после https://vk.com/.
@@ -150,7 +151,7 @@ class VkParser:
             except (ConnectionError, AttributeError):
                 time.sleep(0.2)
 
-    def _get_saved_messages_statistics(self) -> tuple[int, int]:
+    def _get_saved_messages_statistics(self) -> Tuple[int, int]:
         """
         messages_scanned_before - количество сообщений, уже сохранённых в базе (чтобы не сканировать сначала).
         last_scanned_id - последний ID сообщения в базе (меняется на 1 при отсутствии сообщений в базе).
