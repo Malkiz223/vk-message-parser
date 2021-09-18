@@ -1,5 +1,4 @@
 import os
-import sys
 
 # Авторизация происходит либо по паролю, либо по access token
 # Не обязателен, если будет введён логин и пароль. Токен можно получить здесь: https://vkhost.github.io/
@@ -11,8 +10,6 @@ VK_PASSWORD: str = os.getenv('VK_PASSWORD')  # 'qwerty123'
 # Сохранять ли сессию в файл, чтобы при повторном запуске не стучаться на сервер аутентификации
 SAVE_SESSION: bool = True  # True / False
 
-if not (all([VK_LOGIN, VK_PASSWORD])) and not VK_ACCESS_TOKEN:
-    sys.exit('Не получили связку логин+пароль и нет токена')
 
 # Настройки PostgreSQL
 POSTGRES_USER: str = 'postgres'  # пользователь по умолчанию
